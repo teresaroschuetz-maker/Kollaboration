@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fallarbeit</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem; background: #f4f1ea; }
+  #status { font-size: .9rem; color: #666; margin-bottom: 1rem; }
+  #fehler { background: #fbebeb; color: #a00; padding: .8rem; border-radius: 6px; margin-bottom: 1rem; }
+  #faelle { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.5rem; align-items: start; }
+  .fall { background: #fff; border-radius: 10px; padding: 1rem; box-shadow: 0 2px 6px rgba(0,0,0,.12); }
+  .fall h2 { margin: 0 0 .6rem; font-size: 1.25rem; }
+  .beschreibung { background: #e7f1fb; border-radius: 6px; padding: .8rem;
+                  white-space: pre-wrap; margin-bottom: 1rem; }
+  .beschreibung.leer { color: #777; font-style: italic; }
+  .bearbeiten { margin-bottom: 1rem; }
+  .bearbeiten textarea { width: 100%; box-sizing: border-box; min-height: 7rem;
+                         padding: .6rem; font: inherit; }
+  .gruppe { border-top: 1px solid #e3e0d8; padding: .8rem 0 .4rem; }
+  .gruppe h3 { margin: 0 0 .5rem; font-size: 1rem; }
+  .liste { display: flex; flex-direction: column; gap: .4rem; margin-bottom: .5rem; }
+  .note { background: #fff59d; padding: .5rem .7rem; border-radius: 6px; white-space: pre-wrap; }
+  .gruppe form { display: flex; gap: .4rem; }
+  .gruppe input { flex: 1; padding: .45rem; font-size: 1rem; min-width: 0; }
+  button { padding: .45rem .8rem; font-size: 1rem; cursor: pointer; }
+</style>
+</head>
+<body>
+<h1>Fallarbeit</h1>
+<div id="status">Verbinde …</div>
+<div id="fehler" hidden></div>
+<div id="faelle"></div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1/+esm';
+
+// >>> Hier deine Fälle anpassen <<<
+const FAELLE = [
+  { id: 'fall1', titel: 'Fall 1' },
+  { id: 'fall2', titel: 'Fall 2' },
+  { id: 'fall3', titel: 'Fall 3' },
+  { id: 'fall4', titel: 'Fall 4' },
+  { id: 'fall5', titel: 'Fall 5' },
+];
+
+// >>> Hier die Gruppen anpassen <<<
+const GRUPPEN = ['Gruppe 1', 'Gruppe 2', 'Gruppe 3', 'Gruppe 4', 'Gruppe 5', 'Gruppe 6'];
+
+// >>> Hier deine beiden Werte aus Teil 3 eintragen <<<
+const supabase = createClient('https://oeqlvlrnflqfevktfyuz.supabase.co', 'sb_publishable_x7jDXG-iMW23TDVUm9HSEA_bDANHESG');
+
+const board = location.hash.slice(1) || 'fallarbeit';
+const bearbeitenModus = new URLSearchParams(location.search).has('bearbeiten');
+const statusBox = document.getElementById('status');
+const listen = {};          // Beitragslisten, z. B. listen['fall1-g3']
+const beschreibungen = {};  // Beschreibungsfelder je Fall
+let pin = null;
+
+function zeigeFehler(text) {
+  const box = document.getElementById('fehler');
+  box.textContent = 'Fehler: ' + text;
+  box.hidden = false;
+}
+
+function element(tag, klasse, text) {
+  const el = document.createElement(tag);
+  if (klasse) el.className = klasse;
+  if (text) el.textContent = text;
+  return el;
+}
+
+// Fälle und Gruppen aufbauen
+for (const fall of FAELLE) {
+  const box = element('div', 'fall');
+  box.append(element('h2', '', fall.titel));
+
+  // Fallbeschreibung (Studierende: nur lesen)
+  const anzeige = element('div', 'beschreibung leer', 'Noch keine Fallbeschreibung.');
+  box.append(anzeige);
+  beschreibungen[fall.id] = { anzeige };
+
+  // Bearbeiten-Modus: Feld zum Schreiben der Beschreibung
+  if (bearbeitenModus) {
+    anzeige.hidden = true;
+    const bereich = element('div', 'bearbeiten');
+    const feld = element('textarea');
+    feld.placeholder = 'Fallbeschreibung eingeben …';
+    const knopf = element('button', '', 'Beschreibung speichern');
+    knopf.addEventListener('click', () => speichern(fall.id, feld.value, knopf));
+    bereich.append(feld, knopf);
+    box.append(bereich);
+    beschreibungen[fall.id].feld = feld;
+  }
+
+  // Gruppen darunter
+  GRUPPEN.forEach((name, i) => {
+    const schluessel = fall.id + '-g' + (i + 1);
+    const gruppe = element('div', 'gruppe');
+    const liste = element('div', 'liste');
+    listen[schluessel] = liste;
+
+    const form = element('form');
+    const input = element('input');
+    input.maxLength = 500;
+    input.required = true;
+    input.placeholder = 'Beitrag von ' + name + ' …';
+    form.append(input, element('button', '', 'Senden'));
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const { error } = await supabase.from('notes')
+        .insert({ board, kachel: schluessel, text: input.value });
+      if (error) zeigeFehler(error.message);
+      else input.value = '';
+    });
+
+    gruppe.append(element('h3', '', name), liste, form);
+    box.append(gruppe);
+  });
+
+  document.getElementById('faelle').append(box);
+}
+
+function addNote(note) {
+  const liste = listen[note.kachel];
+  if (!liste) return;
+  liste.append(element('div', 'note', note.text));
+}
+
+function zeigeBeschreibung(zeile) {
+  const b = beschreibungen[zeile.fall];
+  if (!b) return;
+  const text = zeile.beschreibung.trim();
+  b.anzeige.textContent = text || 'Noch keine Fallbeschreibung.';
+  b.anzeige.classList.toggle('leer', !text);
+  if (b.feld && document.activeElement !== b.feld) b.feld.value = zeile.beschreibung;
+}
+
+async function speichern(fallId, text, knopf) {
+  if (!pin) pin = prompt('Bitte deinen PIN eingeben:');
+  if (!pin) return;
+  const { error } = await supabase.rpc('fall_speichern',
+    { p_board: board, p_fall: fallId, p_text: text, p_pin: pin });
+  if (error) {
+    pin = null;
+    zeigeFehler(error.message);
+  } else {
+    knopf.textContent = 'Gespeichert ✓';
+    setTimeout(() => { knopf.textContent = 'Beschreibung speichern'; }, 2000);
+  }
+}
+
+// Vorhandene Beiträge und Beschreibungen laden
+const [beitraege, texte] = await Promise.all([
+  supabase.from('notes').select('*').eq('board', board).order('created_at'),
+  supabase.from('faelle').select('*').eq('board', board),
+]);
+if (beitraege.error) zeigeFehler(beitraege.error.message);
+else beitraege.data.forEach(addNote);
+if (texte.error) zeigeFehler(texte.error.message);
+else texte.data.forEach(zeigeBeschreibung);
+
+// Änderungen live empfangen
+supabase.channel('fallarbeit-' + board)
+  .on('postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'notes', filter: 'board=eq.' + board },
+      payload => addNote(payload.new))
+  .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'faelle', filter: 'board=eq.' + board },
+      payload => { if (payload.new && payload.new.fall) zeigeBeschreibung(payload.new); })
+  .subscribe(status => {
+    if (status === 'SUBSCRIBED') statusBox.textContent = bearbeitenModus
+      ? '● Live verbunden – Bearbeiten-Modus' : '● Live verbunden';
+    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') statusBox.textContent = '○ Keine Live-Verbindung (siehe Teil 6)';
+  });
+</script>
+</body>
+</html>

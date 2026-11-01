@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pinnwand</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem; background: #f4f1ea; }
+  form { display: flex; gap: .5rem; margin-bottom: 1rem; }
+  input { flex: 1; padding: .6rem; font-size: 1rem; }
+  button { padding: .6rem 1rem; font-size: 1rem; }
+  #status { font-size: .9rem; color: #666; margin-bottom: 1rem; }
+  #fehler { background: #fbebeb; color: #a00; padding: .8rem; border-radius: 6px; margin-bottom: 1rem; }
+  #wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; }
+  .note { background: #fff59d; padding: 1rem; border-radius: 6px;
+          box-shadow: 0 2px 4px rgba(0,0,0,.15); white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>Pinnwand</h1>
+<form id="form">
+  <input id="input" maxlength="500" placeholder="Neuer Beitrag …" required>
+  <button>Anheften</button>
+</form>
+<div id="status">Verbinde …</div>
+<div id="fehler" hidden></div>
+<div id="wall"></div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1/+esm';
+
+// >>> Hier deine beiden Werte aus Teil 3 eintragen <<<
+const supabase = createClient('https://oeqlvlrnflqfevktfyuz.supabase.co', 'sb_publishable_x7jDXG-iMW23TDVUm9HSEA_bDANHESG');
+
+const board = location.hash.slice(1) || 'start';
+const wall = document.getElementById('wall');
+const statusBox = document.getElementById('status');
+
+function zeigeFehler(text) {
+  const box = document.getElementById('fehler');
+  box.textContent = 'Fehler: ' + text;
+  box.hidden = false;
+}
+
+function addNote(note) {
+  const div = document.createElement('div');
+  div.className = 'note';
+  div.textContent = note.text;
+  wall.prepend(div);
+}
+
+// 1. Vorhandene Zettel laden
+const { data, error } = await supabase.from('notes')
+  .select('*').eq('board', board).order('created_at');
+if (error) zeigeFehler(error.message);
+else data.forEach(addNote);
+
+// 2. Neue Zettel live empfangen
+supabase.channel('wall-' + board)
+  .on('postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'notes', filter: 'board=eq.' + board },
+      payload => addNote(payload.new))
+  .subscribe(status => {
+    if (status === 'SUBSCRIBED') statusBox.textContent = '● Live verbunden – Pinnwand: ' + board;
+    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') statusBox.textContent = '○ Keine Live-Verbindung (siehe Teil 6)';
+  });
+
+// 3. Neuen Zettel speichern
+document.getElementById('form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const input = document.getElementById('input');
+  const { error } = await supabase.from('notes').insert({ board, text: input.value });
+  if (error) zeigeFehler(error.message);
+  else input.value = '';
+});
+</script>
+</body>
+</html>
