@@ -31,6 +31,8 @@
 const TOOLS = [
   { symbol: '📌', titel: 'Pinnwand',        text: 'Ideen und Beiträge sammeln',    link: 'pinnwand.html', farbe: '#f2c94c' },
   { symbol: '🧩', titel: 'Fallarbeit',      text: 'Fälle bearbeiten in Gruppen',   link: 'faelle.html',   farbe: '#56a3e0' },
+];
+
 const bereich = document.getElementById('kacheln');
 for (const tool of TOOLS) {
   const kachel = document.createElement('a');
@@ -49,6 +51,9 @@ for (const tool of TOOLS) {
   kachel.append(symbol, titel, text);
   bereich.append(kachel);
 }
+</script>
+</body>
+</html>
 </script>
 </body>
 </html>
