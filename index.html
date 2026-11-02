@@ -17,6 +17,10 @@
   .symbol { font-size: 2.2rem; line-height: 1; }
   .kachel h2 { margin: .7rem 0 .3rem; font-size: 1.2rem; }
   .kachel p { margin: 0; color: #555; font-size: .95rem; }
+    /* >>> Farbdesign Startseite: Schiefer <<< */
+  body { background: #eef1f5; color: #1c2733; }
+  h1 { color: #243b53; }
+  .untertitel, .kachel p { color: #52606d; }
 </style>
 </head>
 <body>
@@ -29,11 +33,11 @@
 <script>
 // >>> Hier deine Kacheln anpassen <<<
 const TOOLS = [
-  { symbol: '📌', titel: 'Pinnwand',          text: 'Ideen und Beiträge sammeln',        link: 'verwaltung.html?tool=pinnwand',   farbe: '#f2c94c' },
-  { symbol: '🧩', titel: 'Fallarbeit',        text: 'Fälle bearbeiten in Gruppen',       link: 'verwaltung.html?tool=fallarbeit', farbe: '#56a3e0' },
-  { symbol: '💡', titel: 'Ideensammlung',     text: 'Brainstorming zu einer Frage',      link: 'verwaltung.html?tool=ideen',      farbe: '#9b51e0' },
-  { symbol: '❓', titel: 'Ideen zu 3 Fragen', text: 'Brainstorming zu mehreren Fragen',  link: 'verwaltung.html?tool=fragen',     farbe: '#f2994a' },
-  { symbol: '⏭️', titel: 'Fragen Schritt für Schritt', text: 'Fragen nacheinander freigeben', link: 'verwaltung.html?tool=schritte', farbe: '#2d9cdb' },
+  { symbol: '📌', titel: 'Pinnwand',          text: 'Ideen und Beiträge sammeln',        link: 'verwaltung.html?tool=pinnwand',   farbe: '#e0a800' },
+  { symbol: '🧩', titel: 'Fallarbeit',        text: 'Fälle bearbeiten in Gruppen',       link: 'verwaltung.html?tool=fallarbeit', farbe: '#1d5fa8' },
+  { symbol: '💡', titel: 'Ideensammlung',     text: 'Brainstorming zu einer Frage',      link: 'verwaltung.html?tool=ideen',      farbe: '#5b3fb5' },
+  { symbol: '❓', titel: 'Ideen zu 3 Fragen', text: 'Brainstorming zu mehreren Fragen',  link: 'verwaltung.html?tool=fragen',     farbe: '#1f7a52' },
+  { symbol: '⏭️', titel: 'Fragen Schritt für Schritt', text: 'Fragen nacheinander freigeben', link: 'verwaltung.html?tool=schritte', farbe: '#0f6e73' },
 ];
 
 const bereich = document.getElementById('kacheln');
