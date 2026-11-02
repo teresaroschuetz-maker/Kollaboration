@@ -42,6 +42,7 @@ const supabase = createClient('https://oeqlvlrnflqfevktfyuz.supabase.co', 'sb_pu
 
 const board = location.hash.slice(1) || 'start';
 const wall = document.getElementById('wall');
+const ZETTELFARBEN = ['#fff59d', '#c8f0c8', '#c9e4ff', '#ffd6e0', '#ffe0b2', '#e1d5ff'];
 const statusBox = document.getElementById('status');
 
 function zeigeFehler(text) {
@@ -53,6 +54,7 @@ function zeigeFehler(text) {
 function addNote(note) {
   const div = document.createElement('div');
   div.className = 'note';
+  div.style.background = ZETTELFARBEN[note.id % ZETTELFARBEN.length];
   div.textContent = note.text;
   wall.prepend(div);
 }
