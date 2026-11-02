@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verwaltung</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; background: #f4f1ea; color: #222; }
+  main { max-width: 800px; margin: 0 auto; padding: 2rem 1.5rem; }
+  a.zurueck { color: #2f6fb3; text-decoration: none; }
+  h1 { margin: .8rem 0 1.5rem; }
+  .box { background: #fff; border-radius: 10px; padding: 1.2rem; box-shadow: 0 2px 6px rgba(0,0,0,.1);
+         margin-bottom: 1.5rem; }
+  .box h2 { margin: 0 0 .8rem; font-size: 1.15rem; }
+  .zeile { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .6rem; }
+  input { padding: .5rem; font-size: 1rem; flex: 1; min-width: 12rem; }
+  button { padding: .5rem .9rem; font-size: 1rem; cursor: pointer; border-radius: 6px;
+           border: 1px solid #bbb; background: #fff; color: #222; }
+  button.haupt { background: #2f6fb3; color: #fff; border-color: #2f6fb3; }
+  .hinweis { font-size: .9rem; color: #666; margin: 0; }
+  #fehler { background: #fbebeb; color: #a00; padding: .8rem; border-radius: 6px; margin-bottom: 1rem; }
+  .eintrag { background: #fff; border-radius: 10px; padding: 1rem; box-shadow: 0 2px 6px rgba(0,0,0,.1);
+             margin-bottom: .8rem; }
+  .eintrag.neu { outline: 3px solid #f2c94c; }
+  .eintrag h3 { margin: 0 0 .2rem; font-size: 1.1rem; }
+  .eintrag .info { font-size: .9rem; color: #666; margin-bottom: .6rem; overflow-wrap: anywhere; white-space: pre-line; }
+  .knoepfe { display: flex; gap: .4rem; flex-wrap: wrap; }
+  #leer { color: #888; font-style: italic; }
+</style>
+</head>
+<body>
+<main>
+  <a class="zurueck" href="index.html">← Alle Tools</a>
+  <h1 id="titel">Verwaltung</h1>
+  <div id="fehler" hidden></div>
+
+  <div class="box" id="anmelden">
+    <h2>Anmelden</h2>
+    <div class="zeile">
+      <input id="pin-feld" type="password" placeholder="Dein PIN">
+      <button id="pin-knopf" class="haupt">Weiter</button>
+    </div>
+    <p class="hinweis">Derselbe PIN wie bei der Fallarbeit.</p>
+  </div>
+
+  <div id="bereich" hidden>
+    <div class="box">
+      <h2>Neu erstellen</h2>
+      <div class="zeile">
+        <input id="titel-feld" maxlength="100" placeholder="Titel, z. B. Seminar Montag">
+      </div>
+      <div class="zeile">
+        <input id="code-feld" maxlength="40" placeholder="Code (leer lassen = Zufallscode)">
+        <button id="erstellen" class="haupt">Erstellen und öffnen</button>
+      </div>
+      <p class="hinweis">Einen eigenen Code brauchst du nur, um eine schon bestehende Sammlung
+        (z. B. seminar-montag) in die Liste aufzunehmen.</p>
+    </div>
+    <h2>Deine Sammlungen</h2>
+    <p id="leer" hidden>Noch nichts erstellt.</p>
+    <div id="liste"></div>
+  </div>
+</main>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1/+esm';
+
+// >>> Hier deine Tools eintragen (Dateinamen genau wie auf GitHub) <<<
+const TOOLS = {
+  pinnwand:   { name: 'Pinnwand',                 datei: 'pinnwand.html',     bearbeiten: false },
+  fallarbeit: { name: 'Fallarbeit',               datei: 'Faelle.html',       bearbeiten: true },
+  ideen:      { name: 'Ideensammlung',            datei: 'ideen.html',        bearbeiten: true },
+  fragen:     { name: 'Ideen zu mehreren Fragen', datei: 'ideen-3fragen.html', bearbeiten: true },
+};
+
+// >>> Hier deine beiden Werte aus Teil 3 eintragen <<<
+const supabase = createClient('https://oeqlvlrnflqfevktfyuz.supabase.co', 'sb_publishable_x7jDXG-iMW23TDVUm9HSEA_bDANHESG');
+
+const $ = id => document.getElementById(id);
+const toolId = new URLSearchParams(location.search).get('tool');
+const tool = TOOLS[toolId];
+let pin = null;
+let neuId = null;
+
+function zeigeFehler(text) {
+  $('fehler').textContent = 'Fehler: ' + text;
+  $('fehler').hidden = false;
+}
+
+function element(tag, klasse, text) {
+  const el = document.createElement(tag);
+  if (klasse) el.className = klasse;
+  if (text) el.textContent = text;
+  return el;
+}
+
+function linkFuer(code, bearbeiten) {
+  return new URL(tool.datei + (bearbeiten ? '?bearbeiten' : '') + '#' + code, location.href).href;
+}
+
+// Zufallscode aus gut lesbaren Zeichen (ohne 0/o, 1/l/i)
+function zufallsCode() {
+  const zeichen = 'abcdefghjkmnpqrstuvwxyz23456789';
+  const zahlen = crypto.getRandomValues(new Uint32Array(8));
+  return Array.from(zahlen, z => zeichen[z % zeichen.length]).join('');
+}
+
+function eigenerCode(text) {
+  return text.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+}
+
+async function kopieren(text, knopf) {
+  try {
+    await navigator.clipboard.writeText(text);
+    const alt = knopf.textContent;
+    knopf.textContent = 'Kopiert ✓';
+    setTimeout(() => { knopf.textContent = alt; }, 2000);
+  } catch {
+    prompt('Link kopieren:', text);
+  }
+}
+
+// ---------- Liste laden und anzeigen ----------
+async function ladeListe() {
+  const { data, error } = await supabase.rpc('sammlung_liste', { p_tool: toolId, p_pin: pin });
+  if (error) { zeigeFehler(error.message); return false; }
+  $('fehler').hidden = true;
+  $('liste').replaceChildren();
+  $('leer').hidden = data.length > 0;
+
+  for (const e of data) {
+    const karte = element('div', 'eintrag' + (e.id === neuId ? ' neu' : ''));
+    karte.append(element('h3', '', e.titel || 'Ohne Titel'));
+    const datum = new Date(e.created_at).toLocaleDateString('de-AT');
+    karte.append(element('div', 'info',
+      'Code: ' + e.code + ' · erstellt am ' + datum + '\nLink für Studierende: ' + linkFuer(e.code, false)));
+
+    const knoepfe = element('div', 'knoepfe');
+    const oeffnen = element('button', 'haupt', 'Öffnen');
+    oeffnen.addEventListener('click', () => window.open(linkFuer(e.code, false), '_blank'));
+    knoepfe.append(oeffnen);
+
+    if (tool.bearbeiten) {
+      const bearbeiten = element('button', '', 'Bearbeiten');
+      bearbeiten.addEventListener('click', () => window.open(linkFuer(e.code, true), '_blank'));
+      knoepfe.append(bearbeiten);
+    }
+
+    const kopie = element('button', '', 'Link für Studierende kopieren');
+    kopie.addEventListener('click', () => kopieren(linkFuer(e.code, false), kopie));
+    knoepfe.append(kopie);
+
+    const weg = element('button', '', 'Aus Liste entfernen');
+    weg.addEventListener('click', async () => {
+      if (!confirm('„' + (e.titel || e.code) + '“ aus der Liste entfernen? Die Beiträge selbst bleiben gespeichert.')) return;
+      const { error } = await supabase.rpc('sammlung_entfernen', { p_id: e.id, p_pin: pin });
+      if (error) zeigeFehler(error.message); else ladeListe();
+    });
+    knoepfe.append(weg);
+
+    karte.append(knoepfe);
+    $('liste').append(karte);
+  }
+  return true;
+}
+
+// ---------- Anmelden ----------
+async function anmelden(eingabe) {
+  pin = eingabe;
+  if (!pin) return;
+  if (await ladeListe()) {
+    try { sessionStorage.setItem('verwaltung-pin', pin); } catch {}
+    $('anmelden').hidden = true;
+    $('bereich').hidden = false;
+  } else {
+    pin = null;
+  }
+}
+
+$('pin-knopf').addEventListener('click', () => anmelden($('pin-feld').value.trim()));
+$('pin-feld').addEventListener('keydown', e => { if (e.key === 'Enter') anmelden($('pin-feld').value.trim()); });
+
+// ---------- Neu erstellen ----------
+$('erstellen').addEventListener('click', async () => {
+  // Den neuen Tab sofort öffnen, sonst blockiert Safari ihn
+  const fenster = window.open('', '_blank');
+  const code = eigenerCode($('code-feld').value) || zufallsCode();
+  const { data, error } = await supabase.rpc('sammlung_anlegen',
+    { p_tool: toolId, p_code: code, p_titel: $('titel-feld').value.trim(), p_pin: pin });
+  if (error) {
+    if (fenster) fenster.close();
+    zeigeFehler(error.message.includes('duplicate')
+      ? 'Diesen Code gibt es schon. Bitte einen anderen wählen.' : error.message);
+    return;
+  }
+  neuId = data.id;
+  const link = linkFuer(code, tool.bearbeiten);
+  if (fenster) fenster.location.href = link; else window.open(link, '_blank');
+  $('titel-feld').value = '';
+  $('code-feld').value = '';
+  ladeListe();
+});
+
+// ---------- Start ----------
+if (!tool) {
+  $('titel').textContent = 'Unbekanntes Tool';
+  $('anmelden').hidden = true;
+  zeigeFehler('Im Link fehlt ?tool=… oder dieser Name steht nicht in der Liste TOOLS.');
+} else {
+  $('titel').textContent = tool.name;
+  document.title = tool.name + ' – Verwaltung';
+  let gemerkt = null;
+  try { gemerkt = sessionStorage.getItem('verwaltung-pin'); } catch {}
+  if (gemerkt) anmelden(gemerkt);
+}
+</script>
+</body>
+</html>
