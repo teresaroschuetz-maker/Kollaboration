@@ -26,6 +26,7 @@
          padding: 1.2rem; margin-bottom: 1.5rem; }
   .box h2 { margin: 0 0 1rem; font-size: 1.2rem; }
   .steuerung { background: var(--akzent-hell); border: 2px solid var(--akzent); }
+  .steuerung.ziel { outline: 3px dashed var(--akzent); outline-offset: 3px; }
   label { display: block; font-weight: 600; margin: .6rem 0 .3rem; }
   textarea { width: 100%; box-sizing: border-box; padding: .6rem; font: inherit;
              border: 1px solid var(--rahmen); border-radius: 8px; }
@@ -35,6 +36,16 @@
            border: 1px solid var(--rahmen); background: var(--flaeche); color: var(--text); }
   button.haupt { background: var(--akzent); border-color: var(--akzent); color: #fff; font-weight: 600; }
   .hinweis { font-size: .9rem; color: var(--leise); margin: .7rem 0 0; }
+  .ungespeichert { color: #8a4b00; font-weight: 600; font-size: .9rem; margin: .6rem 0 0; }
+
+  .bilder { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .6rem; margin: 0 0 1.5rem; }
+  .bilder:empty { display: none; }
+  .steuerung .bilder { margin: .6rem 0 0; }
+  .bild-box { position: relative; }
+  .bild-box img { width: 100%; max-height: 320px; object-fit: contain; background: #fff; display: block;
+                  border-radius: 10px; border: 1px solid var(--rahmen); cursor: zoom-in; }
+  .bild-box .weg { position: absolute; top: 6px; right: 6px; padding: .1rem .55rem; font-size: .85rem;
+                   background: #b3261e; border-color: #b3261e; color: #fff; }
 
   .option { display: block; width: 100%; text-align: left; padding: .9rem 1.1rem; margin-bottom: .6rem;
             font-size: 1.1rem; border: 2px solid var(--rahmen); border-radius: 12px; }
@@ -50,8 +61,15 @@
   .balken-fuellung { background: var(--akzent); height: 100%; width: 0; border-radius: 999px;
                      transition: width .6s ease; }
 
+  #gross { position: fixed; inset: 0; background: rgba(30,15,5,.85); display: flex; align-items: center;
+           justify-content: center; padding: 1.5rem; z-index: 20; cursor: zoom-out; }
+  #gross[hidden] { display: none; }
+  #gross img { max-width: 100%; max-height: 100%; border-radius: 8px; background: #fff; }
+
+  body.beamer main { max-width: 1200px; }
   body.beamer #abstimmen, body.beamer #steuerung { display: none; }
   body.beamer #frage { font-size: 2.4rem; }
+  body.beamer #bilder img { max-height: 50vh; }
   body.beamer .balken-kopf { font-size: 1.4rem; }
   body.beamer .balken-spur { height: 2.2rem; }
 </style>
@@ -64,9 +82,15 @@
   <div class="box steuerung" id="steuerung" hidden>
     <h2>Umfrage vorbereiten</h2>
     <label for="frage-feld">Frage</label>
-    <textarea id="frage-feld" rows="2" placeholder="z. B. Wie sicher fühlen Sie sich beim Thema?"></textarea>
+    <textarea id="frage-feld" rows="2" placeholder="z. B. Welche Grafik zeigt den Zusammenhang richtig? (Bilder mit Cmd+V hier einfügen)"></textarea>
+    <label>Bilder zur Frage (optional)</label>
+    <p class="hinweis" style="margin-top:0">Bild kopieren und im Feld „Frage“ mit Cmd+V einfügen, in diesen Kasten ziehen oder auswählen. Höchstens 4 Bilder.</p>
+    <div class="bilder" id="vorschau"></div>
+    <div class="zeile"><button id="bild-waehlen">Bild auswählen</button></div>
+    <input type="file" id="bild-datei" accept="image/*" multiple hidden>
     <label for="optionen-feld">Antwortmöglichkeiten (eine pro Zeile)</label>
     <textarea id="optionen-feld" rows="5" placeholder="Sehr sicher&#10;Eher sicher&#10;Eher unsicher&#10;Sehr unsicher"></textarea>
+    <p class="ungespeichert" id="ungespeichert" hidden>● Noch nicht gespeichert</p>
     <div class="zeile">
       <button id="speichern" class="haupt">Speichern</button>
       <button id="sicht-knopf"></button>
@@ -76,6 +100,7 @@
   </div>
 
   <h1 id="frage" class="leer">Noch keine Frage eingetragen.</h1>
+  <div class="bilder" id="bilder"></div>
 
   <div class="box" id="abstimmen">
     <div id="auswahl"></div>
@@ -88,9 +113,14 @@
     <div id="balken"></div>
   </div>
 </main>
+<div id="gross" hidden><img alt="Bild in groß"></div>
 
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1/+esm';
+
+// >>> Bilder: höchstens so viele, und so groß (in Pixeln) werden sie gespeichert <<<
+const MAX_BILDER = 4;
+const MAX_BILD_PIXEL = 1400;
 
 // >>> Hier deine beiden Werte aus Teil 3 eintragen <<<
 const supabase = createClient('https://oeqlvlrnflqfevktfyuz.supabase.co', 'sb_publishable_x7jDXG-iMW23TDVUm9HSEA_bDANHESG');
@@ -103,8 +133,11 @@ const $ = id => document.getElementById(id);
 
 let optionen = [];
 let ergebnisseSichtbar = true;
-const stimmen = new Map();       // Person -> gewählte Antwort
-let balkenElemente = new Map();  // Antwort -> Balken auf der Seite
+let bilder = [];        // gespeicherte Bilder
+let entwurf = [];       // Bilder in deiner Vorbereitung
+let geaendert = false;  // gibt es noch nicht Gespeichertes?
+const stimmen = new Map();
+let balkenElemente = new Map();
 let gebauteOptionen = null;
 let pin = null;
 
@@ -138,11 +171,90 @@ if (!person) {
   schreiben('ideen-person', person);
 }
 
+$('gross').addEventListener('click', () => { $('gross').hidden = true; });
+function zeigeGross(src) {
+  $('gross').querySelector('img').src = src;
+  $('gross').hidden = false;
+}
+
+function bilderLesen(text) {
+  try {
+    const liste = JSON.parse(text || '[]');
+    return Array.isArray(liste) ? liste.filter(b => typeof b === 'string' && b.startsWith('data:image/')) : [];
+  } catch { return []; }
+}
+
+function bildVerkleinern(datei) {
+  return new Promise((fertig, fehler) => {
+    const url = URL.createObjectURL(datei);
+    const img = new Image();
+    img.onload = () => {
+      const faktor = Math.min(1, MAX_BILD_PIXEL / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * faktor);
+      c.height = Math.round(img.height * faktor);
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      fertig(c.toDataURL('image/jpeg', 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); fehler(new Error('Das Bild konnte nicht gelesen werden.')); };
+    img.src = url;
+  });
+}
+
+// ---------- Bilder anzeigen ----------
+function bildKasten(src, entfernen) {
+  const kasten = element('div', 'bild-box');
+  const img = element('img');
+  img.src = src;
+  img.alt = 'Bild zur Frage';
+  img.addEventListener('click', () => zeigeGross(src));
+  kasten.append(img);
+  if (entfernen) {
+    const weg = element('button', 'weg', '✕');
+    weg.title = 'Bild entfernen';
+    weg.addEventListener('click', entfernen);
+    kasten.append(weg);
+  }
+  return kasten;
+}
+
+function zeichneBilder() {
+  $('bilder').replaceChildren(...bilder.map(src => bildKasten(src)));
+  if (bearbeitenModus) {
+    $('vorschau').replaceChildren(...entwurf.map((src, i) => bildKasten(src, () => {
+      entwurf.splice(i, 1);
+      markiereGeaendert();
+      zeichneBilder();
+    })));
+  }
+}
+
+function markiereGeaendert() {
+  geaendert = true;
+  $('ungespeichert').hidden = false;
+}
+
+async function bilderHinzufuegen(dateien) {
+  for (const datei of dateien) {
+    if (entwurf.length >= MAX_BILDER) { zeigeFehler('Höchstens ' + MAX_BILDER + ' Bilder pro Umfrage.'); break; }
+    try {
+      entwurf.push(await bildVerkleinern(datei));
+      markiereGeaendert();
+    } catch (err) {
+      zeigeFehler(err.message);
+    }
+  }
+  zeichneBilder();
+}
+
 // ---------- Anzeige ----------
 function zeichne() {
   const meine = stimmen.get(person);
 
-  // Antwortknöpfe
   const auswahl = $('auswahl');
   auswahl.replaceChildren();
   if (!optionen.length) auswahl.append(element('p', 'hinweis', 'Noch keine Antwortmöglichkeiten.'));
@@ -154,7 +266,6 @@ function zeichne() {
   $('meine').textContent = meine && optionen.includes(meine)
     ? 'Deine Stimme: ' + meine + ' – du kannst sie jederzeit ändern.' : '';
 
-  // Balken neu aufbauen, wenn sich die Antwortmöglichkeiten geändert haben
   const schluessel = optionen.join('\n');
   if (schluessel !== gebauteOptionen) {
     gebauteOptionen = schluessel;
@@ -174,7 +285,6 @@ function zeichne() {
     }
   }
 
-  // Stimmen zählen
   const anzahl = new Map(optionen.map(o => [o, 0]));
   for (const a of stimmen.values()) if (anzahl.has(a)) anzahl.set(a, anzahl.get(a) + 1);
   const gesamt = [...anzahl.values()].reduce((s, n) => s + n, 0);
@@ -207,15 +317,27 @@ function zeigeFrage(text) {
 function verarbeiteEinstellung(z) {
   if (z.fall === 'frage') {
     zeigeFrage(z.beschreibung);
-    if (bearbeitenModus && document.activeElement !== $('frage-feld')) $('frage-feld').value = z.beschreibung || '';
+    if (bearbeitenModus && !geaendert && document.activeElement !== $('frage-feld')) $('frage-feld').value = z.beschreibung || '';
   } else if (z.fall === 'optionen') {
     optionen = [...new Set((z.beschreibung || '').split('\n').map(s => s.trim()).filter(Boolean))];
-    if (bearbeitenModus && document.activeElement !== $('optionen-feld')) $('optionen-feld').value = optionen.join('\n');
+    if (bearbeitenModus && !geaendert && document.activeElement !== $('optionen-feld')) $('optionen-feld').value = optionen.join('\n');
     zeichne();
   } else if (z.fall === 'ergebnisse') {
     ergebnisseSichtbar = z.beschreibung !== 'verborgen';
     zeichne();
+  } else if (z.fall === 'bilder') {
+    bilder = bilderLesen(z.beschreibung);
+    if (!geaendert) entwurf = [...bilder];
+    zeichneBilder();
   }
+}
+
+// Bilder sind groß und werden nach einer Live-Meldung frisch geladen
+async function bilderNachladen() {
+  const { data, error } = await supabase.from('faelle').select('*')
+    .eq('board', board).eq('fall', 'bilder').maybeSingle();
+  if (error) zeigeFehler(error.message);
+  else if (data) verarbeiteEinstellung(data);
 }
 
 // ---------- Abstimmen ----------
@@ -241,13 +363,46 @@ function einstellungSpeichern(fall, text) {
 
 if (bearbeitenModus) {
   $('steuerung').hidden = false;
+  $('frage-feld').addEventListener('input', markiereGeaendert);
+  $('optionen-feld').addEventListener('input', markiereGeaendert);
+
+  // Bilder einfügen: Cmd+V, Hineinziehen oder Auswählen
+  $('steuerung').addEventListener('paste', e => {
+    const dateien = [...(e.clipboardData ? e.clipboardData.files : [])].filter(f => f.type.startsWith('image/'));
+    if (!dateien.length) return;
+    e.preventDefault();
+    bilderHinzufuegen(dateien);
+  });
+  $('steuerung').addEventListener('dragover', e => { e.preventDefault(); $('steuerung').classList.add('ziel'); });
+  $('steuerung').addEventListener('dragleave', () => $('steuerung').classList.remove('ziel'));
+  $('steuerung').addEventListener('drop', e => {
+    $('steuerung').classList.remove('ziel');
+    const dateien = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
+    if (!dateien.length) return;
+    e.preventDefault();
+    bilderHinzufuegen(dateien);
+  });
+  $('bild-waehlen').addEventListener('click', () => $('bild-datei').click());
+  $('bild-datei').addEventListener('change', () => {
+    bilderHinzufuegen([...$('bild-datei').files]);
+    $('bild-datei').value = '';
+  });
 
   $('speichern').addEventListener('click', async () => {
     const frage = $('frage-feld').value;
     const liste = $('optionen-feld').value;
-    if (await einstellungSpeichern('frage', frage) && await einstellungSpeichern('optionen', liste)) {
+    const bilderText = JSON.stringify(entwurf);
+    $('speichern').disabled = true;
+    const ok = await einstellungSpeichern('frage', frage)
+      && await einstellungSpeichern('optionen', liste)
+      && await einstellungSpeichern('bilder', bilderText);
+    $('speichern').disabled = false;
+    if (ok) {
+      geaendert = false;
+      $('ungespeichert').hidden = true;
       verarbeiteEinstellung({ fall: 'frage', beschreibung: frage });
       verarbeiteEinstellung({ fall: 'optionen', beschreibung: liste });
+      verarbeiteEinstellung({ fall: 'bilder', beschreibung: bilderText });
       $('speichern').textContent = 'Gespeichert ✓';
       setTimeout(() => { $('speichern').textContent = 'Speichern'; }, 2000);
     }
@@ -288,7 +443,11 @@ supabase.channel('umfrage-' + board)
   .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'stimmen' },
       p => { if (p.old.board === board) { stimmen.delete(p.old.person); zeichne(); } })
   .on('postgres_changes', { event: '*', schema: 'public', table: 'faelle', filter: nurBoard },
-      p => { if (p.new && p.new.fall) verarbeiteEinstellung(p.new); })
+      p => {
+        if (!p.new || !p.new.fall) return;
+        if (p.new.fall === 'bilder') bilderNachladen();
+        else verarbeiteEinstellung(p.new);
+      })
   .subscribe(status => {
     if (status === 'SUBSCRIBED') $('status').textContent = bearbeitenModus
       ? '● Live verbunden – Bearbeiten-Modus' : '● Live verbunden';
