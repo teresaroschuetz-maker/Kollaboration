@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Abstimmung mit Pro und Contra</title>
+<style>
+  /* >>> Farben: Indigo <<< */
+  :root {
+    --hintergrund: #eef0fb;
+    --flaeche:     #ffffff;
+    --text:        #1b1f3b;
+    --leise:       #5a5f7d;
+    --rahmen:      #d3d7f0;
+    --akzent:      #3949ab;
+    --akzent-hell: #e1e5f8;
+    --pro:         #1f7a3d;
+    --pro-hell:    #e3f4e8;
+    --contra:      #b3261e;
+    --contra-hell: #fbe7e5;
+    --gold:        #f2c94c;
+  }
+
+  body { font-family: system-ui, sans-serif; margin: 0; background: var(--hintergrund); color: var(--text); }
+  main { max-width: 1000px; margin: 0 auto; padding: 2rem 1.5rem; }
+  #status { font-size: .9rem; color: var(--leise); margin-bottom: .8rem; }
+  #fehler { background: #fbebeb; color: #a00; padding: .8rem; border-radius: 8px; margin-bottom: 1rem; }
+  #frage { font-size: 1.8rem; margin: .5rem 0 .4rem; white-space: pre-wrap; color: var(--akzent); }
+  #frage.leer { color: var(--leise); font-weight: 400; font-style: italic; }
+  #phase-hinweis { color: var(--leise); margin: 0 0 1.5rem; }
+  .box { background: var(--flaeche); border: 1px solid var(--rahmen); border-radius: 14px;
+         padding: 1.1rem; margin-bottom: 1.5rem; }
+  .steuerung { background: var(--akzent-hell); border: 2px solid var(--akzent); }
+  .steuerung h2 { margin: 0 0 .8rem; font-size: 1.15rem; }
+  label { display: block; font-weight: 600; margin: .6rem 0 .3rem; }
+  textarea, input { box-sizing: border-box; font: inherit; border: 1px solid var(--rahmen);
+                    border-radius: 8px; padding: .55rem .7rem; background: var(--flaeche); color: var(--text); }
+  textarea { width: 100%; min-height: 3.5rem; }
+  textarea:focus, input:focus { outline: 2px solid var(--akzent); outline-offset: 1px; }
+  #name-feld { width: 100%; max-width: 22rem; margin-bottom: .8rem; }
+  .zeile { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .6rem; align-items: center; }
+  button { padding: .5rem 1rem; font-size: 1rem; cursor: pointer; border-radius: 999px;
+           border: 1px solid var(--rahmen); background: var(--flaeche); color: var(--text); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.haupt, button.aktiv { background: var(--akzent); border-color: var(--akzent); color: #fff; font-weight: 600; }
+  .leise { color: var(--leise); }
+  .chip { padding: .3rem .9rem; font-size: .9rem; }
+
+  .vorschlag { background: var(--flaeche); border: 1px solid var(--rahmen); border-radius: 14px;
+               padding: 1.1rem; margin-bottom: 1.2rem; box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+  .vorschlag.gewinner { border: 3px solid var(--gold); }
+  .vorschlag h3 { margin: 0 0 .2rem; font-size: 1.25rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .pokal { display: none; font-weight: 700; margin-bottom: .4rem; }
+  .gewinner .pokal { display: block; }
+  .meta { font-size: .85rem; color: var(--leise); margin-bottom: .8rem; }
+  .stimmzeile { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .stimme.meine { background: var(--akzent); border-color: var(--akzent); color: #fff; font-weight: 600; }
+  .anzahl { color: var(--leise); white-space: nowrap; }
+  .balken-spur { flex: 1; min-width: 8rem; background: var(--akzent-hell); border-radius: 999px; height: .9rem; overflow: hidden; }
+  .balken-fuellung { background: var(--akzent); height: 100%; width: 0; border-radius: 999px; transition: width .5s ease; }
+
+  .argumente { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 640px) { .argumente { grid-template-columns: 1fr; } }
+  .spalte { border-radius: 10px; padding: .8rem; }
+  .spalte.pro { background: var(--pro-hell); }
+  .spalte.contra { background: var(--contra-hell); }
+  .spalte h4 { margin: 0 0 .5rem; }
+  .pro h4 { color: var(--pro); }
+  .contra h4 { color: var(--contra); }
+  .argument { background: var(--flaeche); border-radius: 8px; padding: .45rem .6rem; margin-bottom: .4rem;
+              font-size: .95rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .pro .argument { border-left: 4px solid var(--pro); }
+  .contra .argument { border-left: 4px solid var(--contra); }
+  .argument .wer { display: block; font-size: .8rem; color: var(--leise); }
+  .spalte form { display: flex; gap: .4rem; margin-top: .5rem; }
+  .spalte form input { flex: 1; min-width: 0; }
+  .pro form button { background: var(--pro); border-color: var(--pro); color: #fff; }
+  .contra form button { background: var(--contra); border-color: var(--contra); color: #fff; }
+  .keine { color: var(--leise); font-style: italic; }
+</style>
+</head>
+<body>
+<main>
+  <div id="status">Verbinde …</div>
+  <div id="fehler" hidden></div>
+
+  <div class="box steuerung" id="steuerung" hidden>
+    <h2>Abstimmung steuern</h2>
+    <label for="frage-feld">Frage</label>
+    <textarea id="frage-feld" placeholder="z. B. Welches Thema nehmen wir für das Projekt?"></textarea>
+    <div class="zeile"><button id="frage-speichern" class="haupt">Frage speichern</button></div>
+    <label>Phase</label>
+    <div class="zeile" id="phasen"></div>
+    <div class="zeile"><button id="zuruecksetzen">Stimmen zurücksetzen</button></div>
+  </div>
+
+  <h1 id="frage" class="leer">Noch keine Frage eingetragen.</h1>
+  <p id="phase-hinweis"></p>
+
+  <div class="box">
+    <input id="name-feld" maxlength="60" placeholder="Dein Name (optional)">
+    <div id="vorschlag-bereich">
+      <textarea id="vorschlag-feld" maxlength="300" placeholder="Dein Vorschlag …"></textarea>
+      <div class="zeile"><button id="vorschlag-senden" class="haupt">Vorschlag hinzufügen</button></div>
+    </div>
+  </div>
+
+  <div class="zeile" id="sortierung" style="margin-bottom:1rem"></div>
+  <p class="keine" id="keine">Noch keine Vorschläge.</p>
+  <div id="liste"></div>
+</main>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1/+esm';
+
+// >>> Hier deine beiden Werte aus Teil 3 eintragen <<<
+const supabase = createClient('https://oeqlvlrnflqfevktfyuz.supabase.co', 'sb_publishable_x7jDXG-iMW23TDVUm9HSEA_bDANHESG');
+
+const board = location.hash.slice(1) || 'abstimmung';
+const bearbeitenModus = new URLSearchParams(location.search).has('bearbeiten');
+const $ = id => document.getElementById(id);
+
+const PHASEN = {
+  offen:     { knopf: 'Sammeln und abstimmen', hinweis: 'Mach Vorschläge, sammle Argumente und stimm für deinen Favoriten.' },
+  abstimmen: { knopf: 'Nur noch abstimmen',    hinweis: 'Neue Vorschläge sind geschlossen. Jetzt abstimmen!' },
+  beendet:   { knopf: 'Beendet',               hinweis: 'Die Abstimmung ist beendet.' },
+};
+
+const vorschlaege = new Map();  // Nummer -> Vorschlag
+const karten = new Map();
+const stimmen = new Map();      // Person -> Nummer des Vorschlags (als Text)
+let phase = 'offen';
+let sortierung = 'neu';
+let pin = null;
+
+// ---------- Hilfsfunktionen ----------
+function lesen(key) { try { return localStorage.getItem(key); } catch { return null; } }
+function schreiben(key, wert) { try { localStorage.setItem(key, wert); } catch {} }
+
+function zeigeFehler(text) {
+  $('fehler').textContent = 'Fehler: ' + text;
+  $('fehler').hidden = false;
+}
+
+function element(tag, klasse, text) {
+  const el = document.createElement(tag);
+  if (klasse) el.className = klasse;
+  if (text) el.textContent = text;
+  return el;
+}
+
+function zeit(datum) {
+  return new Date(datum).toLocaleString('de-AT', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+async function mitPin(aktion) {
+  if (!pin) pin = prompt('Bitte deinen PIN eingeben:');
+  if (!pin) return false;
+  const { error } = await aktion(pin);
+  if (error) { pin = null; zeigeFehler(error.message); return false; }
+  return true;
+}
+
+let person = lesen('ideen-person');
+if (!person) {
+  person = Date.now().toString(36) + Math.random().toString(36).slice(2);
+  schreiben('ideen-person', person);
+}
+$('name-feld').value = lesen('ideen-name') || '';
+$('name-feld').addEventListener('input', () => schreiben('ideen-name', $('name-feld').value));
+const meinName = () => $('name-feld').value.trim() || null;
+
+// ---------- Sortierung ----------
+function baueSortierung() {
+  const s = $('sortierung');
+  s.replaceChildren(element('span', 'leise', 'Sortieren:'));
+  for (const [id, name] of [['neu', 'Neueste'], ['stimmen', 'Meiste Stimmen']]) {
+    const b = element('button', 'chip' + (sortierung === id ? ' aktiv' : ''), name);
+    b.addEventListener('click', () => { sortierung = id; baueSortierung(); zeichne(); });
+    s.append(b);
+  }
+}
+
+// ---------- Karten ----------
+function argumentSpalte(v, art, titel) {
+  const spalte = element('div', 'spalte ' + art);
+  spalte.append(element('h4', '', titel));
+  const liste = element('div');
+  const form = element('form');
+  const input = element('input');
+  input.maxLength = 300;
+  input.required = true;
+  input.placeholder = art === 'pro' ? 'Argument dafür …' : 'Argument dagegen …';
+  form.append(input, element('button', '', '+'));
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const { error } = await supabase.from('kommentare')
+      .insert({ idee_id: v.id, board, text: input.value.trim(), name: meinName(), art });
+    if (error) zeigeFehler(error.message); else input.value = '';
+  });
+  spalte.append(liste, form);
+  return { spalte, liste, form };
+}
+
+function karteErstellen(v) {
+  const el = element('div', 'vorschlag');
+  el.append(element('div', 'pokal', '🏆 Meiste Stimmen'));
+  el.append(element('h3', '', v.text));
+  el.append(element('div', 'meta', (v.name || 'Anonym') + ' · ' + zeit(v.created_at)));
+
+  const stimmzeile = element('div', 'stimmzeile');
+  const knopf = element('button', 'stimme');
+  knopf.addEventListener('click', () => abstimmen(v));
+  const anzahl = element('span', 'anzahl');
+  const spur = element('div', 'balken-spur');
+  const fuellung = element('div', 'balken-fuellung');
+  spur.append(fuellung);
+  stimmzeile.append(knopf, anzahl, spur);
+  el.append(stimmzeile);
+
+  const pro = argumentSpalte(v, 'pro', '👍 Pro');
+  const contra = argumentSpalte(v, 'contra', '👎 Contra');
+  const argumente = element('div', 'argumente');
+  argumente.append(pro.spalte, contra.spalte);
+  el.append(argumente);
+
+  karten.set(v.id, { el, knopf, anzahl, fuellung, pro, contra });
+}
+
+function stimmenFuer(id) {
+  let n = 0;
+  for (const a of stimmen.values()) if (a === String(id)) n++;
+  return n;
+}
+
+function zeichne() {
+  const zaehlung = new Map([...vorschlaege.keys()].map(id => [id, stimmenFuer(id)]));
+  const gesamt = [...zaehlung.values()].reduce((s, n) => s + n, 0);
+  const max = Math.max(0, ...zaehlung.values());
+  const meine = stimmen.get(person);
+  const geschlossen = phase === 'beendet';
+
+  const sortiert = [...vorschlaege.values()].sort((a, b) => {
+    if (sortierung === 'stimmen' && zaehlung.get(b.id) !== zaehlung.get(a.id)) return zaehlung.get(b.id) - zaehlung.get(a.id);
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
+  const liste = $('liste');
+  sortiert.forEach((v, i) => {
+    const k = karten.get(v.id);
+    if (liste.children[i] !== k.el) liste.insertBefore(k.el, liste.children[i] || null);
+
+    const n = zaehlung.get(v.id);
+    const prozent = gesamt ? Math.round(n / gesamt * 100) : 0;
+    k.anzahl.textContent = n + (n === 1 ? ' Stimme' : ' Stimmen') + ' · ' + prozent + ' %';
+    k.fuellung.style.width = prozent + '%';
+    const istMeine = meine === String(v.id);
+    k.knopf.textContent = istMeine ? '✓ Deine Stimme' : 'Dafür stimmen';
+    k.knopf.classList.toggle('meine', istMeine);
+    k.knopf.disabled = geschlossen;
+    k.pro.form.hidden = geschlossen;
+    k.contra.form.hidden = geschlossen;
+    k.el.classList.toggle('gewinner', geschlossen && max > 0 && n === max);
+  });
+  $('keine').hidden = vorschlaege.size > 0;
+
+  $('phase-hinweis').textContent = PHASEN[phase].hinweis;
+  $('vorschlag-bereich').hidden = phase !== 'offen';
+  if (bearbeitenModus) {
+    for (const b of $('phasen').children) b.classList.toggle('aktiv', b.dataset.phase === phase);
+  }
+}
+
+// ---------- Daten verarbeiten ----------
+function neuerVorschlag(z) {
+  if (z.board !== board || vorschlaege.has(z.id)) return;
+  const v = { ...z, argumente: new Set() };
+  vorschlaege.set(v.id, v);
+  karteErstellen(v);
+}
+
+function vorschlagEntfernen(id) {
+  const k = karten.get(id);
+  if (k) k.el.remove();
+  karten.delete(id);
+  vorschlaege.delete(id);
+}
+
+function neuesArgument(z) {
+  const v = vorschlaege.get(z.idee_id);
+  if (!v || !z.art || v.argumente.has(z.id)) return;
+  v.argumente.add(z.id);
+  const box = element('div', 'argument');
+  box.append(element('span', 'wer', (z.name || 'Anonym') + ' · ' + zeit(z.created_at)));
+  box.append(z.text);
+  karten.get(v.id)[z.art].liste.append(box);
+}
+
+function verarbeiteEinstellung(z) {
+  if (z.fall === 'frage') {
+    const t = (z.beschreibung || '').trim();
+    $('frage').textContent = t || 'Noch keine Frage eingetragen.';
+    $('frage').classList.toggle('leer', !t);
+    if (bearbeitenModus && document.activeElement !== $('frage-feld')) $('frage-feld').value = z.beschreibung || '';
+  } else if (z.fall === 'phase' && PHASEN[z.beschreibung]) {
+    phase = z.beschreibung;
+    if (phase === 'beendet') { sortierung = 'stimmen'; baueSortierung(); }
+    zeichne();
+  }
+}
+
+// ---------- Aktionen ----------
+$('vorschlag-senden').addEventListener('click', async () => {
+  const text = $('vorschlag-feld').value.trim();
+  if (!text) return;
+  const { error } = await supabase.from('ideen').insert({ board, text, name: meinName() });
+  if (error) zeigeFehler(error.message); else $('vorschlag-feld').value = '';
+});
+
+async function abstimmen(v) {
+  const id = String(v.id);
+  const vorher = stimmen.get(person);
+  if (vorher === id || phase === 'beendet') return;
+  stimmen.set(person, id);
+  zeichne();
+  const { error } = await supabase.from('stimmen').upsert(
+    { board, person, antwort: id, updated_at: new Date().toISOString() }, { onConflict: 'board,person' });
+  if (error) {
+    if (vorher) stimmen.set(person, vorher); else stimmen.delete(person);
+    zeichne();
+    zeigeFehler(error.message);
+  }
+}
+
+function einstellungSpeichern(fall, text) {
+  return mitPin(p => supabase.rpc('fall_speichern', { p_board: board, p_fall: fall, p_text: text, p_pin: p }));
+}
+
+if (bearbeitenModus) {
+  $('steuerung').hidden = false;
+  $('frage-speichern').addEventListener('click', async () => {
+    const text = $('frage-feld').value;
+    if (await einstellungSpeichern('frage', text)) {
+      verarbeiteEinstellung({ fall: 'frage', beschreibung: text });
+      $('frage-speichern').textContent = 'Gespeichert ✓';
+      setTimeout(() => { $('frage-speichern').textContent = 'Frage speichern'; }, 2000);
+    }
+  });
+  for (const [id, p] of Object.entries(PHASEN)) {
+    const b = element('button', '', p.knopf);
+    b.dataset.phase = id;
+    b.addEventListener('click', async () => {
+      if (await einstellungSpeichern('phase', id)) verarbeiteEinstellung({ fall: 'phase', beschreibung: id });
+    });
+    $('phasen').append(b);
+  }
+  $('zuruecksetzen').addEventListener('click', async () => {
+    if (!confirm('Alle Stimmen dieser Abstimmung löschen? Vorschläge und Argumente bleiben erhalten.')) return;
+    if (await mitPin(p => supabase.rpc('stimmen_loeschen', { p_board: board, p_pin: p }))) {
+      stimmen.clear();
+      zeichne();
+    }
+  });
+}
+
+// ---------- Laden ----------
+baueSortierung();
+const [r1, r2, r3, r4] = await Promise.all([
+  supabase.from('ideen').select('*').eq('board', board).order('created_at'),
+  supabase.from('kommentare').select('*').eq('board', board).order('created_at'),
+  supabase.from('stimmen').select('person, antwort').eq('board', board),
+  supabase.from('faelle').select('*').eq('board', board),
+]);
+for (const r of [r1, r2, r3, r4]) if (r.error) zeigeFehler(r.error.message);
+(r1.data || []).forEach(neuerVorschlag);
+(r2.data || []).forEach(neuesArgument);
+(r3.data || []).forEach(s => stimmen.set(s.person, s.antwort));
+(r4.data || []).forEach(verarbeiteEinstellung);
+zeichne();
+
+// ---------- Live-Aktualisierung ----------
+const nurBoard = 'board=eq.' + board;
+supabase.channel('abstimmung-' + board)
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ideen', filter: nurBoard },
+      p => { neuerVorschlag(p.new); zeichne(); })
+  .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'ideen' },
+      p => { vorschlagEntfernen(p.old.id); zeichne(); })
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'kommentare', filter: nurBoard },
+      p => neuesArgument(p.new))
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'stimmen', filter: nurBoard },
+      p => { stimmen.set(p.new.person, p.new.antwort); zeichne(); })
+  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'stimmen', filter: nurBoard },
+      p => { stimmen.set(p.new.person, p.new.antwort); zeichne(); })
+  .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'stimmen' },
+      p => { if (p.old.board === board) { stimmen.delete(p.old.person); zeichne(); } })
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'faelle', filter: nurBoard },
+      p => { if (p.new && p.new.fall) verarbeiteEinstellung(p.new); })
+  .subscribe(status => {
+    if (status === 'SUBSCRIBED') $('status').textContent = bearbeitenModus
+      ? '● Live verbunden – Bearbeiten-Modus' : '● Live verbunden';
+    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') $('status').textContent = '○ Keine Live-Verbindung (siehe Teil 6)';
+  });
+</script>
+</body>
+</html>
