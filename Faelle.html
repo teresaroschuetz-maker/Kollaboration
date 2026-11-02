@@ -5,36 +5,43 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Fallarbeit</title>
 <style>
-  body { font-family: system-ui, sans-serif; margin: 2rem; background: #f4f1ea; }
-  #status { font-size: .9rem; color: #666; margin-bottom: 1rem; }
+  body { font-family: system-ui, sans-serif; margin: 2rem; background: #e8f1fb; color: #14243a; }
+  h1 { color: #1d4f8a; }
+  #status { font-size: .9rem; color: #3f5673; margin-bottom: 1rem; }
   #fehler { background: #fbebeb; color: #a00; padding: .8rem; border-radius: 6px; margin-bottom: 1rem; }
-  #faelle { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: 1.5rem; align-items: start; }
-  .fall { background: #fff; border-radius: 10px; padding: 1rem; box-shadow: 0 2px 6px rgba(0,0,0,.12); }
+  #faelle { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; align-items: start; }
+  .fall { background: #fff; border-radius: 10px; padding: 1rem; box-shadow: 0 2px 6px rgba(0,0,0,.12);
+          border-top: 6px solid #1d5fa8; }
   .fall h2 { margin: 0 0 .6rem; font-size: 1.25rem; }
-  .beschreibung { background: #e7f1fb; border-radius: 6px; padding: .8rem;
-                  white-space: pre-wrap; margin-bottom: 1rem; }
-  .beschreibung.leer { color: #777; font-style: italic; }
-  .bearbeiten { margin-bottom: 1rem; }
-  .bearbeiten textarea { width: 100%; box-sizing: border-box; min-height: 7rem;
-                         padding: .6rem; font: inherit; }
-  .gruppe { border-top: 1px solid #e3e0d8; padding: .8rem 0 .4rem; }
-  .gruppe h3 { margin: 0 0 .5rem; font-size: 1rem; }
+  .beschreibung { background: #fff; border: 1px solid #c5d8ef; border-left: 5px solid #1d5fa8; border-radius: 6px;
+                  padding: .8rem; white-space: pre-wrap; margin-bottom: .6rem; }
+  .beschreibung.leer { color: #5a6b80; font-style: italic; }
+  .bilder { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: .5rem; margin-bottom: 1rem; }
+  .bilder:empty { display: none; }
+  .bild-box { position: relative; }
+  .bild-box img { width: 100%; height: 110px; object-fit: cover; border-radius: 6px; border: 1px solid #c5d8ef;
+                  cursor: zoom-in; display: block; }
+  .bild-box .weg { position: absolute; top: 4px; right: 4px; padding: .1rem .5rem; font-size: .85rem; background: #b3261e; }
+  .bearbeiten { margin-bottom: .6rem; }
+  .bearbeiten textarea { width: 100%; box-sizing: border-box; min-height: 7rem; padding: .6rem; font: inherit;
+                         border: 1px solid #c5d8ef; border-radius: 6px; }
+  .bearbeiten textarea.ziel { outline: 3px dashed #1d5fa8; }
+  .bild-hinweis { font-size: .85rem; color: #3f5673; margin: .3rem 0 .5rem; }
+  .ungespeichert { color: #8a4b00; font-weight: 600; font-size: .85rem; margin: .3rem 0; }
+  .zeile { display: flex; gap: .4rem; flex-wrap: wrap; }
+  .gruppe { border-top: 1px solid #d5e3f3; padding: .8rem 0 .4rem; }
+  .gruppe h3 { margin: 0 0 .5rem; font-size: 1rem; color: #1d4f8a; }
   .liste { display: flex; flex-direction: column; gap: .4rem; margin-bottom: .5rem; }
-  .note { background: #fff59d; padding: .5rem .7rem; border-radius: 6px; white-space: pre-wrap; }
+  .note { background: #fff4c2; color: #14243a; padding: .5rem .7rem; border-radius: 6px; white-space: pre-wrap; }
   .gruppe form { display: flex; gap: .4rem; }
-  .gruppe input { flex: 1; padding: .45rem; font-size: 1rem; min-width: 0; }
-  button { padding: .45rem .8rem; font-size: 1rem; cursor: pointer; }
-    /* >>> Farbdesign Fallarbeit: Himmelblau <<< */
-  body { background: #e8f1fb; color: #14243a; }
-  h1, .gruppe h3 { color: #1d4f8a; }
-  #status { color: #3f5673; }
-  .fall { border-top: 6px solid #1d5fa8; }
-  .beschreibung { background: #ffffff; border: 1px solid #c5d8ef; border-left: 5px solid #1d5fa8; }
-  .beschreibung.leer { color: #5a6b80; }
-  .gruppe { border-top-color: #d5e3f3; }
-  .note { background: #fff4c2; color: #14243a; }
-  button { background: #1d5fa8; color: #fff; border: none; border-radius: 999px; }
+  .gruppe input { flex: 1; padding: .45rem; font-size: 1rem; min-width: 0; border: 1px solid #c5d8ef; border-radius: 6px; }
+  button { padding: .45rem .9rem; font-size: 1rem; cursor: pointer; background: #1d5fa8; color: #fff;
+           border: none; border-radius: 999px; }
+  button.zweit { background: #fff; color: #1d4f8a; border: 1px solid #c5d8ef; }
+  #gross { position: fixed; inset: 0; background: rgba(10,20,35,.85); display: flex; align-items: center;
+           justify-content: center; padding: 1.5rem; z-index: 20; cursor: zoom-out; }
+  #gross[hidden] { display: none; }
+  #gross img { max-width: 100%; max-height: 100%; border-radius: 8px; background: #fff; }
 </style>
 </head>
 <body>
@@ -42,6 +49,7 @@
 <div id="status">Verbinde …</div>
 <div id="fehler" hidden></div>
 <div id="faelle"></div>
+<div id="gross" hidden><img alt="Bild in groß"></div>
 
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1/+esm';
@@ -58,20 +66,24 @@ const FAELLE = [
 // >>> Hier die Gruppen anpassen <<<
 const GRUPPEN = ['Gruppe 1', 'Gruppe 2', 'Gruppe 3', 'Gruppe 4', 'Gruppe 5', 'Gruppe 6'];
 
+// >>> Bilder: höchstens so viele pro Fall, und so breit (in Pixeln) werden sie gespeichert <<<
+const MAX_BILDER = 4;
+const MAX_BREITE = 1200;
+
 // >>> Hier deine beiden Werte aus Teil 3 eintragen <<<
 const supabase = createClient('https://oeqlvlrnflqfevktfyuz.supabase.co', 'sb_publishable_x7jDXG-iMW23TDVUm9HSEA_bDANHESG');
 
 const board = location.hash.slice(1) || 'fallarbeit';
 const bearbeitenModus = new URLSearchParams(location.search).has('bearbeiten');
-const statusBox = document.getElementById('status');
-const listen = {};          // Beitragslisten, z. B. listen['fall1-g3']
-const beschreibungen = {};  // Beschreibungsfelder je Fall
+const $ = id => document.getElementById(id);
+const listen = {};
+const bereiche = {};
 let pin = null;
 
+// ---------- Hilfsfunktionen ----------
 function zeigeFehler(text) {
-  const box = document.getElementById('fehler');
-  box.textContent = 'Fehler: ' + text;
-  box.hidden = false;
+  $('fehler').textContent = 'Fehler: ' + text;
+  $('fehler').hidden = false;
 }
 
 function element(tag, klasse, text) {
@@ -81,36 +93,115 @@ function element(tag, klasse, text) {
   return el;
 }
 
-// Fälle und Gruppen aufbauen
+async function mitPin(aktion) {
+  if (!pin) pin = prompt('Bitte deinen PIN eingeben:');
+  if (!pin) return false;
+  const { error } = await aktion(pin);
+  if (error) { pin = null; zeigeFehler(error.message); return false; }
+  return true;
+}
+
+function bilderLesen(text) {
+  try {
+    const liste = JSON.parse(text || '[]');
+    return Array.isArray(liste) ? liste.filter(b => typeof b === 'string' && b.startsWith('data:image/')) : [];
+  } catch { return []; }
+}
+
+// Bild verkleinern und als Text (Data-URL) zurückgeben
+function bildVerkleinern(datei) {
+  return new Promise((fertig, fehler) => {
+    const url = URL.createObjectURL(datei);
+    const img = new Image();
+    img.onload = () => {
+      const faktor = Math.min(1, MAX_BREITE / img.width);
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * faktor);
+      c.height = Math.round(img.height * faktor);
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      fertig(c.toDataURL('image/jpeg', 0.8));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); fehler(new Error('Das Bild konnte nicht gelesen werden.')); };
+    img.src = url;
+  });
+}
+
+// Bild groß anzeigen
+$('gross').addEventListener('click', () => { $('gross').hidden = true; });
+function zeigeGross(src) {
+  $('gross').querySelector('img').src = src;
+  $('gross').hidden = false;
+}
+
+// ---------- Fälle aufbauen ----------
 for (const fall of FAELLE) {
   const box = element('div', 'fall');
   box.append(element('h2', '', fall.titel));
 
-  // Fallbeschreibung (Studierende: nur lesen)
   const anzeige = element('div', 'beschreibung leer', 'Noch keine Fallbeschreibung.');
+  const bilderEl = element('div', 'bilder');
   box.append(anzeige);
-  beschreibungen[fall.id] = { anzeige };
+  const b = { anzeige, bilderEl, bilder: [], entwurf: [], feld: null, ungespeichert: null, geaendert: false };
+  bereiche[fall.id] = b;
 
-  // Bearbeiten-Modus: Feld zum Schreiben der Beschreibung
   if (bearbeitenModus) {
     anzeige.hidden = true;
     const bereich = element('div', 'bearbeiten');
     const feld = element('textarea');
-    feld.placeholder = 'Fallbeschreibung eingeben …';
-    const knopf = element('button', '', 'Beschreibung speichern');
-    knopf.addEventListener('click', () => speichern(fall.id, feld.value, knopf));
-    bereich.append(feld, knopf);
+    feld.placeholder = 'Fallbeschreibung eingeben … Bilder mit Cmd+V hier einfügen.';
+    const hinweis = element('p', 'bild-hinweis', 'Bilder: kopieren und hier mit Cmd+V einfügen, hineinziehen oder auswählen.');
+    const ungespeichert = element('p', 'ungespeichert', '● Noch nicht gespeichert');
+    ungespeichert.hidden = true;
+    const dateiwahl = element('input');
+    dateiwahl.type = 'file';
+    dateiwahl.accept = 'image/*';
+    dateiwahl.multiple = true;
+    dateiwahl.hidden = true;
+    const waehlen = element('button', 'zweit', 'Bild auswählen');
+    const speichern = element('button', '', 'Speichern');
+    const zeile = element('div', 'zeile');
+    zeile.append(speichern, waehlen);
+    bereich.append(feld, hinweis, bilderEl, ungespeichert, zeile, dateiwahl);
     box.append(bereich);
-    beschreibungen[fall.id].feld = feld;
+    b.feld = feld;
+    b.ungespeichert = ungespeichert;
+
+    const markieren = () => { b.geaendert = true; ungespeichert.hidden = false; };
+    feld.addEventListener('input', markieren);
+    feld.addEventListener('paste', e => {
+      const dateien = [...(e.clipboardData ? e.clipboardData.files : [])].filter(f => f.type.startsWith('image/'));
+      if (!dateien.length) return;
+      e.preventDefault();
+      bilderHinzufuegen(fall.id, dateien);
+    });
+    feld.addEventListener('dragover', e => { e.preventDefault(); feld.classList.add('ziel'); });
+    feld.addEventListener('dragleave', () => feld.classList.remove('ziel'));
+    feld.addEventListener('drop', e => {
+      feld.classList.remove('ziel');
+      const dateien = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
+      if (!dateien.length) return;
+      e.preventDefault();
+      bilderHinzufuegen(fall.id, dateien);
+    });
+    waehlen.addEventListener('click', () => dateiwahl.click());
+    dateiwahl.addEventListener('change', () => {
+      bilderHinzufuegen(fall.id, [...dateiwahl.files]);
+      dateiwahl.value = '';
+    });
+    speichern.addEventListener('click', () => fallSpeichern(fall, speichern));
+  } else {
+    box.append(bilderEl);
   }
 
-  // Gruppen darunter
   GRUPPEN.forEach((name, i) => {
     const schluessel = fall.id + '-g' + (i + 1);
     const gruppe = element('div', 'gruppe');
     const liste = element('div', 'liste');
     listen[schluessel] = liste;
-
     const form = element('form');
     const input = element('input');
     input.maxLength = 500;
@@ -119,70 +210,130 @@ for (const fall of FAELLE) {
     form.append(input, element('button', '', 'Senden'));
     form.addEventListener('submit', async e => {
       e.preventDefault();
-      const { error } = await supabase.from('notes')
-        .insert({ board, kachel: schluessel, text: input.value });
-      if (error) zeigeFehler(error.message);
-      else input.value = '';
+      const { error } = await supabase.from('notes').insert({ board, kachel: schluessel, text: input.value });
+      if (error) zeigeFehler(error.message); else input.value = '';
     });
-
     gruppe.append(element('h3', '', name), liste, form);
     box.append(gruppe);
   });
 
-  document.getElementById('faelle').append(box);
+  $('faelle').append(box);
 }
 
+// ---------- Bilder anzeigen ----------
+function zeichneBilder(fallId) {
+  const b = bereiche[fallId];
+  const liste = bearbeitenModus ? b.entwurf : b.bilder;
+  b.bilderEl.replaceChildren();
+  liste.forEach((src, i) => {
+    const kasten = element('div', 'bild-box');
+    const img = element('img');
+    img.src = src;
+    img.alt = 'Bild zum Fall';
+    img.addEventListener('click', () => zeigeGross(src));
+    kasten.append(img);
+    if (bearbeitenModus) {
+      const weg = element('button', 'weg', '✕');
+      weg.title = 'Bild entfernen';
+      weg.addEventListener('click', () => {
+        b.entwurf.splice(i, 1);
+        b.geaendert = true;
+        b.ungespeichert.hidden = false;
+        zeichneBilder(fallId);
+      });
+      kasten.append(weg);
+    }
+    b.bilderEl.append(kasten);
+  });
+}
+
+async function bilderHinzufuegen(fallId, dateien) {
+  const b = bereiche[fallId];
+  for (const datei of dateien) {
+    if (b.entwurf.length >= MAX_BILDER) { zeigeFehler('Höchstens ' + MAX_BILDER + ' Bilder pro Fall.'); break; }
+    try {
+      b.entwurf.push(await bildVerkleinern(datei));
+      b.geaendert = true;
+      b.ungespeichert.hidden = false;
+    } catch (err) {
+      zeigeFehler(err.message);
+    }
+  }
+  zeichneBilder(fallId);
+}
+
+async function fallSpeichern(fall, knopf) {
+  const b = bereiche[fall.id];
+  const text = b.feld.value;
+  const bilderText = JSON.stringify(b.entwurf);
+  knopf.disabled = true;
+  const ok = await mitPin(p => supabase.rpc('fall_speichern',
+      { p_board: board, p_fall: fall.id, p_text: text, p_pin: p }))
+    && await mitPin(p => supabase.rpc('fall_speichern',
+      { p_board: board, p_fall: fall.id + '-bilder', p_text: bilderText, p_pin: p }));
+  knopf.disabled = false;
+  if (ok) {
+    b.bilder = [...b.entwurf];
+    b.geaendert = false;
+    b.ungespeichert.hidden = true;
+    knopf.textContent = 'Gespeichert ✓';
+    setTimeout(() => { knopf.textContent = 'Speichern'; }, 2000);
+  }
+}
+
+// ---------- Daten verarbeiten ----------
 function addNote(note) {
   const liste = listen[note.kachel];
   if (!liste) return;
   liste.append(element('div', 'note', note.text));
 }
 
-function zeigeBeschreibung(zeile) {
-  const b = beschreibungen[zeile.fall];
-  if (!b) return;
-  const text = zeile.beschreibung.trim();
-  b.anzeige.textContent = text || 'Noch keine Fallbeschreibung.';
-  b.anzeige.classList.toggle('leer', !text);
-  if (b.feld && document.activeElement !== b.feld) b.feld.value = zeile.beschreibung;
-}
-
-async function speichern(fallId, text, knopf) {
-  if (!pin) pin = prompt('Bitte deinen PIN eingeben:');
-  if (!pin) return;
-  const { error } = await supabase.rpc('fall_speichern',
-    { p_board: board, p_fall: fallId, p_text: text, p_pin: pin });
-  if (error) {
-    pin = null;
-    zeigeFehler(error.message);
-  } else {
-    knopf.textContent = 'Gespeichert ✓';
-    setTimeout(() => { knopf.textContent = 'Beschreibung speichern'; }, 2000);
+function verarbeiteFall(zeile) {
+  for (const fall of FAELLE) {
+    const b = bereiche[fall.id];
+    if (zeile.fall === fall.id) {
+      const text = (zeile.beschreibung || '').trim();
+      b.anzeige.textContent = text || 'Noch keine Fallbeschreibung.';
+      b.anzeige.classList.toggle('leer', !text);
+      if (b.feld && !b.geaendert && document.activeElement !== b.feld) b.feld.value = zeile.beschreibung || '';
+    } else if (zeile.fall === fall.id + '-bilder') {
+      b.bilder = bilderLesen(zeile.beschreibung);
+      if (!b.geaendert) b.entwurf = [...b.bilder];
+      zeichneBilder(fall.id);
+    }
   }
 }
 
-// Vorhandene Beiträge und Beschreibungen laden
+// Große Einträge (Bilder) werden nach einer Live-Meldung frisch geladen
+async function nachladen(fallName) {
+  const { data, error } = await supabase.from('faelle').select('*')
+    .eq('board', board).eq('fall', fallName).maybeSingle();
+  if (error) zeigeFehler(error.message);
+  else if (data) verarbeiteFall(data);
+}
+
+// ---------- Laden ----------
 const [beitraege, texte] = await Promise.all([
   supabase.from('notes').select('*').eq('board', board).order('created_at'),
   supabase.from('faelle').select('*').eq('board', board),
 ]);
-if (beitraege.error) zeigeFehler(beitraege.error.message);
-else beitraege.data.forEach(addNote);
-if (texte.error) zeigeFehler(texte.error.message);
-else texte.data.forEach(zeigeBeschreibung);
+if (beitraege.error) zeigeFehler(beitraege.error.message); else beitraege.data.forEach(addNote);
+if (texte.error) zeigeFehler(texte.error.message); else texte.data.forEach(verarbeiteFall);
 
-// Änderungen live empfangen
+// ---------- Live-Aktualisierung ----------
 supabase.channel('fallarbeit-' + board)
-  .on('postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'notes', filter: 'board=eq.' + board },
-      payload => addNote(payload.new))
-  .on('postgres_changes',
-      { event: '*', schema: 'public', table: 'faelle', filter: 'board=eq.' + board },
-      payload => { if (payload.new && payload.new.fall) zeigeBeschreibung(payload.new); })
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notes', filter: 'board=eq.' + board },
+      p => addNote(p.new))
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'faelle', filter: 'board=eq.' + board },
+      p => {
+        if (!p.new || !p.new.fall) return;
+        if (p.new.fall.endsWith('-bilder')) nachladen(p.new.fall);
+        else verarbeiteFall(p.new);
+      })
   .subscribe(status => {
-    if (status === 'SUBSCRIBED') statusBox.textContent = bearbeitenModus
+    if (status === 'SUBSCRIBED') $('status').textContent = bearbeitenModus
       ? '● Live verbunden – Bearbeiten-Modus' : '● Live verbunden';
-    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') statusBox.textContent = '○ Keine Live-Verbindung (siehe Teil 6)';
+    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') $('status').textContent = '○ Keine Live-Verbindung (siehe Teil 6)';
   });
 </script>
 </body>
