@@ -46,12 +46,24 @@
   #flaeche.stift { cursor: crosshair; touch-action: none; }
   #flaeche.zettel-modus { cursor: copy; }
   #linien { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
-  .zettel { position: absolute; z-index: 1; width: 170px; min-height: 90px; box-sizing: border-box;
-            padding: .7rem .8rem; border-radius: 6px; box-shadow: 0 4px 10px rgba(0,0,0,.15);
-            font-size: .95rem; color: #1d1d1d; white-space: pre-wrap; overflow-wrap: anywhere;
-            cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
-  .zettel.zieht { cursor: grabbing; box-shadow: 0 10px 22px rgba(0,0,0,.25); z-index: 3; }
-  #flaeche.stift .zettel, #flaeche.zettel-modus .zettel { pointer-events: none; }
+
+  .objekt { position: absolute; z-index: 1; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+  .objekt.zieht { cursor: grabbing; z-index: 3; box-shadow: 0 10px 22px rgba(0,0,0,.25); }
+  .objekt.gesperrt { cursor: default; }
+  #flaeche.stift .objekt, #flaeche.zettel-modus .objekt { pointer-events: none; }
+  .zettel { width: 170px; min-height: 90px; box-sizing: border-box; padding: .7rem .8rem; border-radius: 6px;
+            box-shadow: 0 4px 10px rgba(0,0,0,.15); font-size: .95rem; color: #1d1d1d;
+            white-space: pre-wrap; overflow-wrap: anywhere; }
+  .bild-objekt { padding: 4px; background: #fff; border-radius: 6px; box-shadow: 0 4px 10px rgba(0,0,0,.15); box-sizing: border-box; }
+  .bild-objekt img { display: block; width: 100%; height: auto; border-radius: 4px; pointer-events: none; }
+  body:not(.lehrend) .objekt.gesperrt::after { content: '🔒'; position: absolute; top: -10px; right: -8px; font-size: .85rem; }
+  .schloss { position: absolute; top: -12px; right: -12px; width: 30px; height: 30px; padding: 0;
+             font-size: .85rem; box-shadow: 0 2px 6px rgba(0,0,0,.2); z-index: 4; }
+
+  #gross { position: fixed; inset: 0; background: rgba(10,20,35,.85); display: flex; align-items: center;
+           justify-content: center; padding: 1.5rem; z-index: 30; cursor: zoom-out; }
+  #gross[hidden] { display: none; }
+  #gross img { max-width: 100%; max-height: 100%; border-radius: 8px; background: #fff; }
 </style>
 </head>
 <body>
@@ -64,6 +76,8 @@
     <textarea id="thema-feld" placeholder="Thema oder Arbeitsauftrag …"></textarea>
     <div class="zeile">
       <button id="thema-speichern" class="haupt">Thema speichern</button>
+      <button id="alles-sperren">🔒 Alles sperren</button>
+      <button id="alles-entsperren">🔓 Alles entsperren</button>
       <button id="leeren">Ganze Tafel leeren</button>
     </div>
   </div>
@@ -74,6 +88,8 @@
     <button data-modus="zeigen">✋ Verschieben</button>
     <button data-modus="stift">✏️ Stift</button>
     <button data-modus="zettel">🗒️ Zettel</button>
+    <button id="bild-knopf">🖼️ Bild</button>
+    <input type="file" id="bild-datei" accept="image/*" multiple hidden>
     <span class="trenner"></span>
     <span id="farben"></span>
     <span class="trenner"></span>
@@ -85,6 +101,7 @@
     <div id="flaeche"><svg id="linien"></svg></div>
   </div>
 </main>
+<div id="gross" hidden><img alt="Bild in groß"></div>
 
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1/+esm';
@@ -93,17 +110,22 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const STIFTFARBEN  = ['#1d1d1d', '#1d5fa8', '#b3261e', '#1f7a3d', '#8a4b00', '#6a1b9a'];
 const ZETTELFARBEN = ['#fff59d', '#c8f0c8', '#c9e4ff', '#ffd6e0', '#ffe0b2', '#e1d5ff'];
 
+// >>> Bilder: Breite auf der Tafel und gespeicherte Größe (in Pixeln) <<<
+const BILD_BREITE = 360;
+const MAX_BILD_PIXEL = 1200;
+
 // >>> Hier deine beiden Werte aus Teil 3 eintragen <<<
 const supabase = createClient('https://oeqlvlrnflqfevktfyuz.supabase.co', 'sb_publishable_x7jDXG-iMW23TDVUm9HSEA_bDANHESG');
 
 const board = location.hash.slice(1) || 'whiteboard';
 const bearbeitenModus = new URLSearchParams(location.search).has('bearbeiten');
+if (bearbeitenModus) document.body.classList.add('lehrend');
 const $ = id => document.getElementById(id);
 const flaeche = $('flaeche');
 const svg = $('linien');
 const SVGNS = 'http://www.w3.org/2000/svg';
 
-const objekte = new Map();   // Nummer -> Zettel oder Strich auf der Fläche
+const objekte = new Map();   // Nummer -> { el, typ, gesperrt, zieht, schloss }
 const meine = [];            // eigene Objekte für „Rückgängig“
 let modus = 'zeigen';
 let stiftFarbe = STIFTFARBEN[0];
@@ -137,9 +159,15 @@ async function mitPin(aktion) {
   return true;
 }
 
+$('gross').addEventListener('click', () => { $('gross').hidden = true; });
+function zeigeGross(src) {
+  $('gross').querySelector('img').src = src;
+  $('gross').hidden = false;
+}
+
 // ---------- Werkzeuge ----------
 const HINWEISE = {
-  zeigen: 'Zettel mit der Maus oder dem Finger verschieben.',
+  zeigen: 'Zettel und Bilder verschieben. Bilder mit Cmd+V einfügen.',
   stift:  'Auf die Fläche zeichnen.',
   zettel: 'Auf die Fläche tippen, wo der Zettel hin soll.',
 };
@@ -175,7 +203,7 @@ for (const b of document.querySelectorAll('[data-modus]')) {
   b.addEventListener('click', () => setzeModus(b.dataset.modus));
 }
 
-// ---------- Zettel und Striche anzeigen ----------
+// ---------- Objekte anzeigen ----------
 function pfadText(punkte) {
   return punkte.map((p, i) => (i ? 'L' : 'M') + p[0] + ' ' + p[1]).join(' ');
 }
@@ -191,34 +219,81 @@ function neuerPfad(farbe) {
   return p;
 }
 
+function setzeSperre(o, wert) {
+  o.gesperrt = wert;
+  if (o.typ === 'linie') return;
+  o.el.classList.toggle('gesperrt', wert);
+  if (o.schloss) {
+    o.schloss.textContent = wert ? '🔒' : '🔓';
+    o.schloss.title = wert ? 'Entsperren' : 'Sperren';
+  }
+}
+
+function schlossHinzufuegen(o, id) {
+  const knopf = element('button', 'schloss');
+  knopf.addEventListener('pointerdown', e => e.stopPropagation());
+  knopf.addEventListener('click', async e => {
+    e.stopPropagation();
+    const neu = !o.gesperrt;
+    if (await mitPin(p => supabase.rpc('whiteboard_sperren', { p_id: id, p_gesperrt: neu, p_pin: p }))) setzeSperre(o, neu);
+  });
+  o.el.append(knopf);
+  o.schloss = knopf;
+}
+
 function zeigeObjekt(z) {
   if (z.board !== board) return;
   const vorhanden = objekte.get(z.id);
   if (vorhanden) {
-    if (z.typ === 'zettel' && !vorhanden.zieht) {
+    if (vorhanden.typ !== 'linie' && !vorhanden.zieht && typeof z.x === 'number') {
       vorhanden.el.style.left = z.x + 'px';
       vorhanden.el.style.top = z.y + 'px';
     }
+    if (typeof z.gesperrt === 'boolean') setzeSperre(vorhanden, z.gesperrt);
     return;
   }
+  if (z.typ === 'bild' && !(typeof z.bild === 'string' && z.bild.startsWith('data:image/'))) return;
+
   let el;
   if (z.typ === 'linie') {
     el = neuerPfad(z.farbe);
     el.setAttribute('d', pfadText(z.punkte || []));
   } else {
-    el = element('div', 'zettel', z.text || '');
-    el.style.background = z.farbe;
+    if (z.typ === 'bild') {
+      el = element('div', 'objekt bild-objekt');
+      const img = element('img');
+      img.src = z.bild;
+      img.alt = 'Bild';
+      el.append(img);
+      el.style.width = (z.breite || BILD_BREITE) + 'px';
+      el.addEventListener('dblclick', () => zeigeGross(z.bild));
+    } else {
+      el = element('div', 'objekt zettel', z.text || '');
+      el.style.background = z.farbe;
+    }
     el.style.left = z.x + 'px';
     el.style.top = z.y + 'px';
-    zettelZiehbarMachen(el, z.id);
     flaeche.append(el);
   }
-  objekte.set(z.id, { el, zieht: false });
+  const o = { el, typ: z.typ, gesperrt: false, zieht: false, schloss: null };
+  objekte.set(z.id, o);
+  if (z.typ !== 'linie') {
+    ziehbarMachen(o, z.id);
+    if (bearbeitenModus) schlossHinzufuegen(o, z.id);
+  }
+  setzeSperre(o, !!z.gesperrt);
 }
 
 function objektEntfernen(id) {
   const o = objekte.get(id);
   if (o) { o.el.remove(); objekte.delete(id); }
+}
+
+// Bilder sind groß und werden deshalb nach einer Live-Meldung frisch geladen
+async function nachladen(id) {
+  const { data, error } = await supabase.from('whiteboard').select('*').eq('id', id).maybeSingle();
+  if (error) zeigeFehler(error.message);
+  else if (data) zeigeObjekt(data);
 }
 
 // ---------- Zeichnen ----------
@@ -248,7 +323,7 @@ async function strichBeenden() {
     .insert({ board, typ: 'linie', farbe: s.farbe, punkte: s.punkte }).select().single();
   if (error) { s.pfad.remove(); zeigeFehler(error.message); return; }
   if (objekte.has(data.id)) s.pfad.remove();
-  else objekte.set(data.id, { el: s.pfad, zieht: false });
+  else objekte.set(data.id, { el: s.pfad, typ: 'linie', gesperrt: false, zieht: false, schloss: null });
   meine.push(data.id);
 }
 flaeche.addEventListener('pointerup', strichBeenden);
@@ -269,12 +344,71 @@ flaeche.addEventListener('click', async e => {
   meine.push(data.id);
 });
 
-// ---------- Zettel verschieben ----------
-function zettelZiehbarMachen(el, id) {
+// ---------- Bilder einfügen ----------
+function bildVerkleinern(datei) {
+  return new Promise((fertig, fehler) => {
+    const url = URL.createObjectURL(datei);
+    const img = new Image();
+    img.onload = () => {
+      const faktor = Math.min(1, MAX_BILD_PIXEL / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * faktor);
+      c.height = Math.round(img.height * faktor);
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      let qualitaet = 0.8;
+      let daten = c.toDataURL('image/jpeg', qualitaet);
+      while (daten.length > 780000 && qualitaet > 0.35) {
+        qualitaet -= 0.15;
+        daten = c.toDataURL('image/jpeg', qualitaet);
+      }
+      if (daten.length > 780000) { fehler(new Error('Das Bild ist zu groß.')); return; }
+      fertig({ daten, breite: Math.max(60, Math.min(BILD_BREITE, c.width)) });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); fehler(new Error('Das Bild konnte nicht gelesen werden.')); };
+    img.src = url;
+  });
+}
+
+async function bildEinfuegen(datei) {
+  try {
+    const { daten, breite } = await bildVerkleinern(datei);
+    const r = $('rahmen');
+    const x = Math.max(0, Math.round(r.scrollLeft + r.clientWidth / 2 - breite / 2));
+    const y = Math.max(0, Math.round(r.scrollTop + r.clientHeight / 2 - 120));
+    const { data, error } = await supabase.from('whiteboard')
+      .insert({ board, typ: 'bild', bild: daten, breite, x, y, farbe: '#ffffff' }).select().single();
+    if (error) { zeigeFehler(error.message); return; }
+    zeigeObjekt(data);
+    meine.push(data.id);
+  } catch (err) {
+    zeigeFehler(err.message);
+  }
+}
+
+document.addEventListener('paste', e => {
+  const ziel = document.activeElement;
+  if (ziel && (ziel.tagName === 'TEXTAREA' || ziel.tagName === 'INPUT')) return;
+  const dateien = [...(e.clipboardData ? e.clipboardData.files : [])].filter(f => f.type.startsWith('image/'));
+  if (!dateien.length) return;
+  e.preventDefault();
+  dateien.forEach(bildEinfuegen);
+});
+
+$('bild-knopf').addEventListener('click', () => $('bild-datei').click());
+$('bild-datei').addEventListener('change', () => {
+  [...$('bild-datei').files].forEach(bildEinfuegen);
+  $('bild-datei').value = '';
+});
+
+// ---------- Verschieben ----------
+function ziehbarMachen(o, id) {
+  const el = o.el;
   el.addEventListener('pointerdown', e => {
-    if (modus !== 'zeigen') return;
-    const o = objekte.get(id);
-    if (!o) return;
+    if (modus !== 'zeigen' || o.gesperrt) return;
     e.preventDefault();
     e.stopPropagation();
     o.zieht = true;
@@ -283,11 +417,13 @@ function zettelZiehbarMachen(el, id) {
     const start = punktVon(e);
     const startX = parseInt(el.style.left, 10);
     const startY = parseInt(el.style.top, 10);
+    const maxX = 2400 - el.offsetWidth;
+    const maxY = 1600 - el.offsetHeight;
 
     const bewegen = ev => {
       const p = punktVon(ev);
-      el.style.left = Math.min(2230, Math.max(0, startX + p[0] - start[0])) + 'px';
-      el.style.top = Math.min(1510, Math.max(0, startY + p[1] - start[1])) + 'px';
+      el.style.left = Math.min(maxX, Math.max(0, startX + p[0] - start[0])) + 'px';
+      el.style.top = Math.min(maxY, Math.max(0, startY + p[1] - start[1])) + 'px';
     };
     const loslassen = async () => {
       el.removeEventListener('pointermove', bewegen);
@@ -308,7 +444,11 @@ function zettelZiehbarMachen(el, id) {
 
 // ---------- Rückgängig ----------
 $('rueckgaengig').addEventListener('click', async () => {
-  while (meine.length && !objekte.has(meine[meine.length - 1])) meine.pop();
+  while (meine.length) {
+    const letzte = objekte.get(meine[meine.length - 1]);
+    if (letzte && !letzte.gesperrt) break;
+    meine.pop();
+  }
   const id = meine.pop();
   if (!id) return;
   objektEntfernen(id);
@@ -324,6 +464,12 @@ function zeigeThema(text) {
   if (bearbeitenModus && document.activeElement !== $('thema-feld')) $('thema-feld').value = text || '';
 }
 
+async function alleSperren(wert) {
+  if (await mitPin(p => supabase.rpc('whiteboard_alle_sperren', { p_board: board, p_gesperrt: wert, p_pin: p }))) {
+    for (const o of objekte.values()) setzeSperre(o, wert);
+  }
+}
+
 if (bearbeitenModus) {
   $('steuerung').hidden = false;
   $('thema-speichern').addEventListener('click', async () => {
@@ -336,8 +482,10 @@ if (bearbeitenModus) {
       setTimeout(() => { $('thema-speichern').textContent = 'Thema speichern'; }, 2000);
     }
   });
+  $('alles-sperren').addEventListener('click', () => alleSperren(true));
+  $('alles-entsperren').addEventListener('click', () => alleSperren(false));
   $('leeren').addEventListener('click', async () => {
-    if (!confirm('Wirklich alle Zettel und Zeichnungen auf dieser Tafel löschen?')) return;
+    if (!confirm('Wirklich alle Zettel, Bilder und Zeichnungen auf dieser Tafel löschen?')) return;
     if (await mitPin(p => supabase.rpc('whiteboard_leeren', { p_board: board, p_pin: p }))) {
       for (const id of [...objekte.keys()]) objektEntfernen(id);
     }
@@ -358,9 +506,9 @@ if (r2.data && r2.data[0]) zeigeThema(r2.data[0].beschreibung);
 const nurBoard = 'board=eq.' + board;
 supabase.channel('whiteboard-' + board)
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'whiteboard', filter: nurBoard },
-      p => zeigeObjekt(p.new))
+      p => { if (p.new.typ === 'bild') { if (!objekte.has(p.new.id)) nachladen(p.new.id); } else zeigeObjekt(p.new); })
   .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'whiteboard', filter: nurBoard },
-      p => zeigeObjekt(p.new))
+      p => { if (objekte.has(p.new.id)) zeigeObjekt(p.new); else nachladen(p.new.id); })
   .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'whiteboard' },
       p => objektEntfernen(p.old.id))
   .on('postgres_changes', { event: '*', schema: 'public', table: 'faelle', filter: nurBoard },
