@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live-Umfrage</title>
+<style>
+  /* >>> Farben: Kupfer <<< */
+  :root {
+    --hintergrund: #fdf0e6;
+    --flaeche:     #ffffff;
+    --text:        #2e1a0c;
+    --leise:       #6f5646;
+    --rahmen:      #f0d2bb;
+    --akzent:      #b34700;
+    --akzent-hell: #fde1cc;
+  }
+
+  body { font-family: system-ui, sans-serif; margin: 0; background: var(--hintergrund); color: var(--text); }
+  main { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem; }
+  #status { font-size: .9rem; color: var(--leise); margin-bottom: .8rem; }
+  #fehler { background: #fbebeb; color: #a00; padding: .8rem; border-radius: 8px; margin-bottom: 1rem; }
+  #frage { font-size: 1.8rem; margin: .5rem 0 1.2rem; white-space: pre-wrap; }
+  #frage.leer { color: var(--leise); font-weight: 400; font-style: italic; }
+  .box { background: var(--flaeche); border: 1px solid var(--rahmen); border-radius: 14px;
+         padding: 1.2rem; margin-bottom: 1.5rem; }
+  .box h2 { margin: 0 0 1rem; font-size: 1.2rem; }
+  .steuerung { background: var(--akzent-hell); border: 2px solid var(--akzent); }
+  label { display: block; font-weight: 600; margin: .6rem 0 .3rem; }
+  textarea { width: 100%; box-sizing: border-box; padding: .6rem; font: inherit;
+             border: 1px solid var(--rahmen); border-radius: 8px; }
+  textarea:focus { outline: 2px solid var(--akzent); outline-offset: 1px; }
+  .zeile { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .8rem; }
+  button { padding: .55rem 1.1rem; font-size: 1rem; cursor: pointer; border-radius: 999px;
+           border: 1px solid var(--rahmen); background: var(--flaeche); color: var(--text); }
+  button.haupt { background: var(--akzent); border-color: var(--akzent); color: #fff; font-weight: 600; }
+  .hinweis { font-size: .9rem; color: var(--leise); margin: .7rem 0 0; }
+
+  .option { display: block; width: 100%; text-align: left; padding: .9rem 1.1rem; margin-bottom: .6rem;
+            font-size: 1.1rem; border: 2px solid var(--rahmen); border-radius: 12px; }
+  .option:hover { border-color: var(--akzent); }
+  .option.gewaehlt { background: var(--akzent); color: #fff; border-color: var(--akzent); font-weight: 600; }
+  .option.gewaehlt::before { content: '✓  '; }
+
+  #gesamt { font-weight: 400; color: var(--leise); font-size: 1rem; }
+  .balken-zeile { margin-bottom: 1rem; }
+  .balken-kopf { display: flex; justify-content: space-between; gap: 1rem; margin-bottom: .3rem; }
+  .balken-wert { color: var(--leise); white-space: nowrap; }
+  .balken-spur { background: var(--akzent-hell); border-radius: 999px; height: 1.4rem; overflow: hidden; }
+  .balken-fuellung { background: var(--akzent); height: 100%; width: 0; border-radius: 999px;
+                     transition: width .6s ease; }
+
+  body.beamer #abstimmen, body.beamer #steuerung { display: none; }
+  body.beamer #frage { font-size: 2.4rem; }
+  body.beamer .balken-kopf { font-size: 1.4rem; }
+  body.beamer .balken-spur { height: 2.2rem; }
+</style>
+</head>
+<body>
+<main>
+  <div id="status">Verbinde …</div>
+  <div id="fehler" hidden></div>
+
+  <div class="box steuerung" id="steuerung" hidden>
+    <h2>Umfrage vorbereiten</h2>
+    <label for="frage-feld">Frage</label>
+    <textarea id="frage-feld" rows="2" placeholder="z. B. Wie sicher fühlen Sie sich beim Thema?"></textarea>
+    <label for="optionen-feld">Antwortmöglichkeiten (eine pro Zeile)</label>
+    <textarea id="optionen-feld" rows="5" placeholder="Sehr sicher&#10;Eher sicher&#10;Eher unsicher&#10;Sehr unsicher"></textarea>
+    <div class="zeile">
+      <button id="speichern" class="haupt">Speichern</button>
+      <button id="sicht-knopf"></button>
+      <button id="zuruecksetzen">Stimmen zurücksetzen</button>
+    </div>
+    <p class="hinweis">Wenn du eine Antwortmöglichkeit umbenennst, zählen die bisherigen Stimmen dafür nicht mehr. Setze die Stimmen dann am besten zurück.</p>
+  </div>
+
+  <h1 id="frage" class="leer">Noch keine Frage eingetragen.</h1>
+
+  <div class="box" id="abstimmen">
+    <div id="auswahl"></div>
+    <p class="hinweis" id="meine"></p>
+  </div>
+
+  <div class="box" id="ergebnis">
+    <h2>Ergebnis <span id="gesamt"></span></h2>
+    <p class="hinweis" id="verborgen" hidden>Die Ergebnisse werden gleich gezeigt.</p>
+    <div id="balken"></div>
+  </div>
+</main>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1/+esm';
+
+// >>> Hier deine beiden Werte aus Teil 3 eintragen <<<
+const supabase = createClient('https://oeqlvlrnflqfevktfyuz.supabase.co', 'sb_publishable_x7jDXG-iMW23TDVUm9HSEA_bDANHESG');
+
+const board = location.hash.slice(1) || 'umfrage';
+const parameter = new URLSearchParams(location.search);
+const bearbeitenModus = parameter.has('bearbeiten');
+if (parameter.has('beamer')) document.body.classList.add('beamer');
+const $ = id => document.getElementById(id);
+
+let optionen = [];
+let ergebnisseSichtbar = true;
+const stimmen = new Map();       // Person -> gewählte Antwort
+let balkenElemente = new Map();  // Antwort -> Balken auf der Seite
+let gebauteOptionen = null;
+let pin = null;
+
+// ---------- Hilfsfunktionen ----------
+function lesen(key) { try { return localStorage.getItem(key); } catch { return null; } }
+function schreiben(key, wert) { try { localStorage.setItem(key, wert); } catch {} }
+
+function zeigeFehler(text) {
+  $('fehler').textContent = 'Fehler: ' + text;
+  $('fehler').hidden = false;
+}
+
+function element(tag, klasse, text) {
+  const el = document.createElement(tag);
+  if (klasse) el.className = klasse;
+  if (text) el.textContent = text;
+  return el;
+}
+
+async function mitPin(aktion) {
+  if (!pin) pin = prompt('Bitte deinen PIN eingeben:');
+  if (!pin) return false;
+  const { error } = await aktion(pin);
+  if (error) { pin = null; zeigeFehler(error.message); return false; }
+  return true;
+}
+
+let person = lesen('ideen-person');
+if (!person) {
+  person = Date.now().toString(36) + Math.random().toString(36).slice(2);
+  schreiben('ideen-person', person);
+}
+
+// ---------- Anzeige ----------
+function zeichne() {
+  const meine = stimmen.get(person);
+
+  // Antwortknöpfe
+  const auswahl = $('auswahl');
+  auswahl.replaceChildren();
+  if (!optionen.length) auswahl.append(element('p', 'hinweis', 'Noch keine Antwortmöglichkeiten.'));
+  for (const o of optionen) {
+    const knopf = element('button', 'option' + (o === meine ? ' gewaehlt' : ''), o);
+    knopf.addEventListener('click', () => abstimmen(o));
+    auswahl.append(knopf);
+  }
+  $('meine').textContent = meine && optionen.includes(meine)
+    ? 'Deine Stimme: ' + meine + ' – du kannst sie jederzeit ändern.' : '';
+
+  // Balken neu aufbauen, wenn sich die Antwortmöglichkeiten geändert haben
+  const schluessel = optionen.join('\n');
+  if (schluessel !== gebauteOptionen) {
+    gebauteOptionen = schluessel;
+    balkenElemente = new Map();
+    $('balken').replaceChildren();
+    for (const o of optionen) {
+      const zeile = element('div', 'balken-zeile');
+      const kopf = element('div', 'balken-kopf');
+      const wert = element('span', 'balken-wert');
+      kopf.append(element('span', '', o), wert);
+      const spur = element('div', 'balken-spur');
+      const fuellung = element('div', 'balken-fuellung');
+      spur.append(fuellung);
+      zeile.append(kopf, spur);
+      $('balken').append(zeile);
+      balkenElemente.set(o, { wert, fuellung });
+    }
+  }
+
+  // Stimmen zählen
+  const anzahl = new Map(optionen.map(o => [o, 0]));
+  for (const a of stimmen.values()) if (anzahl.has(a)) anzahl.set(a, anzahl.get(a) + 1);
+  const gesamt = [...anzahl.values()].reduce((s, n) => s + n, 0);
+
+  const zeigen = bearbeitenModus || ergebnisseSichtbar;
+  $('balken').hidden = !zeigen;
+  $('verborgen').hidden = zeigen;
+  $('gesamt').textContent = '· ' + gesamt + (gesamt === 1 ? ' Stimme' : ' Stimmen')
+    + (bearbeitenModus && !ergebnisseSichtbar ? ' (für Studierende verborgen)' : '');
+
+  for (const [o, n] of anzahl) {
+    const prozent = gesamt ? Math.round(n / gesamt * 100) : 0;
+    const b = balkenElemente.get(o);
+    b.wert.textContent = n + (n === 1 ? ' Stimme' : ' Stimmen') + ' · ' + prozent + ' %';
+    b.fuellung.style.width = prozent + '%';
+  }
+
+  if (bearbeitenModus) {
+    $('sicht-knopf').textContent = ergebnisseSichtbar
+      ? 'Ergebnisse für Studierende verbergen' : 'Ergebnisse für Studierende zeigen';
+  }
+}
+
+function zeigeFrage(text) {
+  const t = (text || '').trim();
+  $('frage').textContent = t || 'Noch keine Frage eingetragen.';
+  $('frage').classList.toggle('leer', !t);
+}
+
+function verarbeiteEinstellung(z) {
+  if (z.fall === 'frage') {
+    zeigeFrage(z.beschreibung);
+    if (bearbeitenModus && document.activeElement !== $('frage-feld')) $('frage-feld').value = z.beschreibung || '';
+  } else if (z.fall === 'optionen') {
+    optionen = [...new Set((z.beschreibung || '').split('\n').map(s => s.trim()).filter(Boolean))];
+    if (bearbeitenModus && document.activeElement !== $('optionen-feld')) $('optionen-feld').value = optionen.join('\n');
+    zeichne();
+  } else if (z.fall === 'ergebnisse') {
+    ergebnisseSichtbar = z.beschreibung !== 'verborgen';
+    zeichne();
+  }
+}
+
+// ---------- Abstimmen ----------
+async function abstimmen(antwort) {
+  const vorher = stimmen.get(person);
+  if (vorher === antwort) return;
+  stimmen.set(person, antwort);
+  zeichne();
+  const { error } = await supabase.from('stimmen').upsert(
+    { board, person, antwort, updated_at: new Date().toISOString() },
+    { onConflict: 'board,person' });
+  if (error) {
+    if (vorher) stimmen.set(person, vorher); else stimmen.delete(person);
+    zeichne();
+    zeigeFehler(error.message);
+  }
+}
+
+// ---------- Bearbeiten-Modus ----------
+function einstellungSpeichern(fall, text) {
+  return mitPin(p => supabase.rpc('fall_speichern', { p_board: board, p_fall: fall, p_text: text, p_pin: p }));
+}
+
+if (bearbeitenModus) {
+  $('steuerung').hidden = false;
+
+  $('speichern').addEventListener('click', async () => {
+    const frage = $('frage-feld').value;
+    const liste = $('optionen-feld').value;
+    if (await einstellungSpeichern('frage', frage) && await einstellungSpeichern('optionen', liste)) {
+      verarbeiteEinstellung({ fall: 'frage', beschreibung: frage });
+      verarbeiteEinstellung({ fall: 'optionen', beschreibung: liste });
+      $('speichern').textContent = 'Gespeichert ✓';
+      setTimeout(() => { $('speichern').textContent = 'Speichern'; }, 2000);
+    }
+  });
+
+  $('sicht-knopf').addEventListener('click', async () => {
+    const neu = ergebnisseSichtbar ? 'verborgen' : 'sichtbar';
+    if (await einstellungSpeichern('ergebnisse', neu)) verarbeiteEinstellung({ fall: 'ergebnisse', beschreibung: neu });
+  });
+
+  $('zuruecksetzen').addEventListener('click', async () => {
+    if (!confirm('Alle Stimmen dieser Umfrage löschen?')) return;
+    if (await mitPin(p => supabase.rpc('stimmen_loeschen', { p_board: board, p_pin: p }))) {
+      stimmen.clear();
+      zeichne();
+    }
+  });
+}
+
+// ---------- Laden ----------
+zeichne();
+const [r1, r2] = await Promise.all([
+  supabase.from('stimmen').select('person, antwort').eq('board', board),
+  supabase.from('faelle').select('*').eq('board', board),
+]);
+for (const r of [r1, r2]) if (r.error) zeigeFehler(r.error.message);
+(r1.data || []).forEach(s => stimmen.set(s.person, s.antwort));
+(r2.data || []).forEach(verarbeiteEinstellung);
+zeichne();
+
+// ---------- Live-Aktualisierung ----------
+const nurBoard = 'board=eq.' + board;
+supabase.channel('umfrage-' + board)
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'stimmen', filter: nurBoard },
+      p => { stimmen.set(p.new.person, p.new.antwort); zeichne(); })
+  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'stimmen', filter: nurBoard },
+      p => { stimmen.set(p.new.person, p.new.antwort); zeichne(); })
+  .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'stimmen' },
+      p => { if (p.old.board === board) { stimmen.delete(p.old.person); zeichne(); } })
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'faelle', filter: nurBoard },
+      p => { if (p.new && p.new.fall) verarbeiteEinstellung(p.new); })
+  .subscribe(status => {
+    if (status === 'SUBSCRIBED') $('status').textContent = bearbeitenModus
+      ? '● Live verbunden – Bearbeiten-Modus' : '● Live verbunden';
+    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') $('status').textContent = '○ Keine Live-Verbindung (siehe Teil 6)';
+  });
+</script>
+</body>
+</html>
