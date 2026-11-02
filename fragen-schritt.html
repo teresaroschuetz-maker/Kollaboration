@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fragen Schritt für Schritt</title>
+<<style>
+  /* >>> Farben: hier änderst du das ganze Aussehen <<< */
+  :root {
+    --hintergrund:   #eef4f3;
+    --flaeche:       #ffffff;
+    --text:          #1f2d33;
+    --leise:         #5f7178;
+    --rahmen:        #c9dbd9;
+    --akzent:        #0f6e73;
+    --akzent-hell:   #d7ecea;
+    --hervor:        #ff7a59;
+    --hervor-hell:   #ffe6de;
+    --frage-flaeche: #e0ecea;
+  }
+
+  body { font-family: system-ui, sans-serif; margin: 0; color: var(--text);
+         background-color: var(--hintergrund);
+         background-image: linear-gradient(180deg, var(--akzent-hell) 0, var(--hintergrund) 320px); }
+  main { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+  #status { font-size: .9rem; color: var(--leise); margin-bottom: .8rem; }
+  #fehler { background: #fbebeb; color: #a00; padding: .8rem; border-radius: 8px; margin-bottom: 1rem; }
+
+  .steuerung { background: var(--hervor-hell); border: 2px solid var(--hervor); border-radius: 14px;
+               padding: 1.2rem; margin-bottom: 1.5rem; }
+  .steuerung strong { display: block; margin-bottom: .7rem; font-size: 1.1rem; }
+  .hinweis { font-size: .9rem; color: var(--leise); margin: .7rem 0 0; }
+
+  .oben { background: var(--flaeche); border: 1px solid var(--rahmen); border-radius: 14px;
+          padding: 1rem 1.2rem; box-shadow: 0 4px 14px rgba(0,0,0,.06); margin-bottom: 2rem; }
+  .oben input { padding: .5rem .7rem; font-size: 1rem; width: 100%; max-width: 22rem; box-sizing: border-box;
+                margin-bottom: .8rem; border: 1px solid var(--rahmen); border-radius: 8px; }
+  textarea { width: 100%; box-sizing: border-box; min-height: 4rem; padding: .6rem .7rem; font: inherit;
+             border: 1px solid var(--rahmen); border-radius: 8px; background: var(--flaeche); color: var(--text); }
+  textarea:focus, input:focus { outline: 2px solid var(--akzent); outline-offset: 1px; }
+
+  button { padding: .5rem 1rem; font-size: 1rem; cursor: pointer; border-radius: 999px;
+           border: 1px solid var(--rahmen); background: var(--flaeche); color: var(--text); }
+  button:hover:not(:disabled) { border-color: var(--akzent); }
+  button:disabled { opacity: .4; cursor: default; }
+  button.haupt { background: var(--akzent); color: #fff; border-color: var(--akzent); font-weight: 600; }
+  .steuerung button.haupt { background: var(--hervor); border-color: var(--hervor); }
+
+  .zeile { display: flex; gap: .5rem; flex-wrap: wrap; }
+  .leiste { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+  .leiste .titel { color: var(--leise); margin-right: .3rem; }
+  .chip { padding: .3rem .9rem; font-size: .9rem; }
+  .chip.aktiv { background: var(--akzent); color: #fff; border-color: var(--akzent); }
+
+  .warten { font-size: 1.4rem; color: var(--akzent); text-align: center; padding: 3rem 1rem;
+            background: var(--flaeche); border: 2px dashed var(--rahmen); border-radius: 14px; }
+
+  #fragen { display: flex; flex-direction: column; }
+  #fragen.neueste-oben { flex-direction: column-reverse; }
+  .frage-bereich { margin-bottom: 2rem; padding: 1.4rem; border-radius: 16px;
+                   background: var(--frage-flaeche); border: 1px solid var(--rahmen); }
+  .frage-bereich.aktuell { background: var(--flaeche); border: 3px solid var(--akzent);
+                           box-shadow: 0 8px 24px rgba(0,0,0,.10); }
+  .marke { display: inline-block; font-size: .78rem; font-weight: 700; letter-spacing: .04em;
+           text-transform: uppercase; background: var(--flaeche); color: var(--leise);
+           border: 1px solid var(--rahmen); border-radius: 999px; padding: .2rem .8rem; margin-bottom: .6rem; }
+  .aktuell .marke { background: var(--hervor); color: #fff; border-color: var(--hervor); }
+  .frage { font-size: 1.6rem; margin: 0 0 1rem; white-space: pre-wrap; }
+  .frage.leer { color: var(--leise); font-weight: 400; font-style: italic; }
+  .bearbeiten { margin-bottom: 1rem; display: grid; gap: .5rem; justify-items: start; }
+
+  .neu { background: var(--akzent-hell); border-radius: 12px; padding: 1rem; margin-bottom: 1rem;
+         display: grid; gap: .6rem; }
+  .keine { color: var(--leise); font-style: italic; }
+  .ideen { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; align-items: start; }
+  .idee { background: var(--flaeche); border: 1px solid var(--rahmen); border-left: 5px solid var(--akzent);
+          border-radius: 12px; padding: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+  .ideetext { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 0 .7rem; }
+  .meta { font-size: .85rem; color: var(--leise); margin-bottom: .6rem; }
+  .aktionen { display: flex; gap: .4rem; }
+  .like.meins { background: var(--hervor-hell); border-color: var(--hervor); }
+
+  .kommentare { margin-top: .8rem; border-top: 1px solid var(--rahmen); padding-top: .6rem; }
+  .kommentar { font-size: .92rem; background: var(--hintergrund); border-radius: 8px; padding: .45rem .6rem;
+               margin-bottom: .4rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .kommentar .wer { display: block; font-size: .8rem; color: var(--leise); }
+  .kommentare form { display: flex; gap: .4rem; }
+  .kommentare input { flex: 1; min-width: 0; padding: .4rem .6rem; font-size: .95rem;
+                      border: 1px solid var(--rahmen); border-radius: 8px; }
+</style>
+</head>
+<body>
+<main>
+  <div id="status">Verbinde …</div>
+  <div id="fehler" hidden></div>
+
+  <div class="steuerung" id="steuerung" hidden>
+    <strong id="stand"></strong>
+    <div class="zeile">
+      <button id="weiter" class="haupt">Nächste Frage freigeben</button>
+      <button id="zurueck">Eine Frage zurück</button>
+      <button id="neustart">Von vorne beginnen</button>
+    </div>
+    <p class="hinweis">Studierende sehen nur freigegebene Fragen. Du siehst hier alle, um sie vorzubereiten.</p>
+  </div>
+
+  <div class="oben">
+    <input id="name-feld" maxlength="60" placeholder="Dein Name (optional)">
+    <div class="leiste" id="sortierung"></div>
+  </div>
+
+  <p class="warten" id="warten" hidden>Bitte kurz warten – die erste Frage erscheint gleich.</p>
+  <div id="fragen"></div>
+</main>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1/+esm';
+
+// >>> Hier die Fragen festlegen (eine Zeile pro Frage) <<<
+const FRAGEN = [
+  { id: 'f1', titel: 'Frage 1' },
+  { id: 'f2', titel: 'Frage 2' },
+  { id: 'f3', titel: 'Frage 3' },
+];
+
+// >>> true = frühere Fragen bleiben sichtbar, false = nur die aktuelle Frage <<<
+const VORHERIGE_ZEIGEN = true;
+
+// >>> Hier deine beiden Werte aus Teil 3 eintragen <<<
+const supabase = createClient('https://oeqlvlrnflqfevktfyuz.supabase.co', 'sb_publishable_x7jDXG-iMW23TDVUm9HSEA_bDANHESG');
+
+const board = location.hash.slice(1) || 'schritte';
+const bearbeitenModus = new URLSearchParams(location.search).has('bearbeiten');
+const $ = id => document.getElementById(id);
+const boardVon = f => board + '--' + f.id;
+const frageVonBoard = new Map(FRAGEN.map(f => [boardVon(f), f]));
+const alleBoards = FRAGEN.map(boardVon);
+
+const ideen = new Map();
+const karten = new Map();
+const bereiche = new Map();
+let sortierung = 'neu';
+let freigabe = 0;    // wie viele Fragen freigegeben sind
+let pin = null;
+
+// ---------- Hilfsfunktionen ----------
+function lesen(key) { try { return localStorage.getItem(key); } catch { return null; } }
+function schreiben(key, wert) { try { localStorage.setItem(key, wert); } catch {} }
+
+function zeigeFehler(text) {
+  $('fehler').textContent = 'Fehler: ' + text;
+  $('fehler').hidden = false;
+}
+
+function element(tag, klasse, text) {
+  const el = document.createElement(tag);
+  if (klasse) el.className = klasse;
+  if (text) el.textContent = text;
+  return el;
+}
+
+function zeit(datum) {
+  return new Date(datum).toLocaleString('de-AT', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+function textMitLinks(el, text) {
+  text.split(/(https?:\/\/[^\s]+)/g).forEach((teil, i) => {
+    if (i % 2 === 1) {
+      const a = element('a', '', teil);
+      a.href = teil;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      el.append(a);
+    } else if (teil) {
+      el.append(teil);
+    }
+  });
+}
+
+async function mitPin(aktion) {
+  if (!pin) pin = prompt('Bitte deinen PIN eingeben:');
+  if (!pin) return false;
+  const { error } = await aktion(pin);
+  if (error) { pin = null; zeigeFehler(error.message); return false; }
+  return true;
+}
+
+let person = lesen('ideen-person');
+if (!person) {
+  person = Date.now().toString(36) + Math.random().toString(36).slice(2);
+  schreiben('ideen-person', person);
+}
+
+$('name-feld').value = lesen('ideen-name') || '';
+$('name-feld').addEventListener('input', () => schreiben('ideen-name', $('name-feld').value));
+const meinName = () => $('name-feld').value.trim() || null;
+
+// ---------- Sortierung ----------
+function baueSortierung() {
+  const s = $('sortierung');
+  s.replaceChildren(element('span', 'titel', 'Antworten sortieren:'));
+  for (const [id, name] of [['neu', 'Neueste'], ['likes', 'Beliebteste']]) {
+    const b = element('button', 'chip' + (sortierung === id ? ' aktiv' : ''), name);
+    b.addEventListener('click', () => { sortierung = id; baueSortierung(); zeichne(); });
+    s.append(b);
+  }
+}
+
+// ---------- Fragenbereiche aufbauen ----------
+if (!bearbeitenModus) $('fragen').classList.add('neueste-oben');
+
+for (const f of FRAGEN) {
+  const el = element('section', 'frage-bereich');
+  const marke = element('span', 'marke');
+  const frageEl = element('h2', 'frage leer', f.titel + ' – noch nicht eingetragen');
+  el.append(marke, frageEl);
+
+  let feld = null;
+  if (bearbeitenModus) {
+    const box = element('div', 'bearbeiten');
+    feld = element('textarea');
+    feld.placeholder = 'Text für ' + f.titel + ' …';
+    const knopf = element('button', 'haupt', 'Frage speichern');
+    knopf.addEventListener('click', async () => {
+      const ok = await mitPin(p => supabase.rpc('fall_speichern',
+        { p_board: board, p_fall: 'frage-' + f.id, p_text: feld.value, p_pin: p }));
+      if (ok) {
+        knopf.textContent = 'Gespeichert ✓';
+        setTimeout(() => { knopf.textContent = 'Frage speichern'; }, 2000);
+      }
+    });
+    box.append(feld, knopf);
+    el.append(box);
+  }
+
+  const neu = element('div', 'neu');
+  const antwortFeld = element('textarea');
+  antwortFeld.maxLength = 1000;
+  antwortFeld.placeholder = 'Deine Antwort …';
+  const senden = element('button', 'haupt', 'Antwort senden');
+  senden.addEventListener('click', async () => {
+    const text = antwortFeld.value.trim();
+    if (!text) return;
+    const { error } = await supabase.from('ideen').insert({ board: boardVon(f), text, name: meinName() });
+    if (error) zeigeFehler(error.message);
+    else antwortFeld.value = '';
+  });
+  const zeile = element('div', 'zeile');
+  zeile.append(senden);
+  neu.append(antwortFeld, zeile);
+  el.append(neu);
+
+  const keine = element('p', 'keine', 'Noch keine Antworten.');
+  const container = element('div', 'ideen');
+  el.append(keine, container);
+
+  bereiche.set(f.id, { el, marke, frageEl, feld, keine, container });
+  $('fragen').append(el);
+}
+
+// ---------- Freigabe anzeigen ----------
+function anzeigen() {
+  FRAGEN.forEach((f, i) => {
+    const b = bereiche.get(f.id);
+    const offen = i < freigabe;
+    const aktuell = i === freigabe - 1;
+    b.el.classList.toggle('aktuell', aktuell);
+    if (bearbeitenModus) {
+      b.el.hidden = false;
+      b.marke.textContent = aktuell ? 'Gerade freigegeben' : offen ? 'Freigegeben' : 'Noch verborgen';
+    } else {
+      b.el.hidden = !(aktuell || (offen && VORHERIGE_ZEIGEN));
+      b.marke.textContent = aktuell ? 'Aktuelle Frage' : 'Frühere Frage';
+    }
+  });
+  $('warten').hidden = bearbeitenModus || freigabe > 0;
+  if (bearbeitenModus) {
+    $('stand').textContent = 'Freigegeben: ' + freigabe + ' von ' + FRAGEN.length + ' Fragen';
+    $('weiter').disabled = freigabe >= FRAGEN.length;
+    $('zurueck').disabled = freigabe <= 0;
+  }
+}
+
+function setzeFreigabe(n) {
+  const vorher = freigabe;
+  freigabe = Math.max(0, Math.min(FRAGEN.length, Number(n) || 0));
+  anzeigen();
+  if (!bearbeitenModus && freigabe > vorher) window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function freigabeSpeichern(n) {
+  const ok = await mitPin(p => supabase.rpc('fall_speichern',
+    { p_board: board, p_fall: 'freigabe', p_text: String(n), p_pin: p }));
+  if (ok) setzeFreigabe(n);
+}
+
+if (bearbeitenModus) {
+  $('steuerung').hidden = false;
+  $('weiter').addEventListener('click', () => freigabeSpeichern(freigabe + 1));
+  $('zurueck').addEventListener('click', () => freigabeSpeichern(freigabe - 1));
+  $('neustart').addEventListener('click', () => {
+    if (confirm('Alle Fragen wieder verbergen? Die Antworten bleiben gespeichert.')) freigabeSpeichern(0);
+  });
+}
+
+// ---------- Antwort-Karten ----------
+function karteErstellen(idee) {
+  const el = element('div', 'idee');
+  el.dataset.id = idee.id;
+  const text = element('p', 'ideetext');
+  textMitLinks(text, idee.text);
+  el.append(text);
+  el.append(element('div', 'meta', (idee.name || 'Anonym') + ' · ' + zeit(idee.created_at)));
+
+  const likeKnopf = element('button', 'like');
+  likeKnopf.addEventListener('click', () => likeUmschalten(idee));
+  const kommentarKnopf = element('button');
+  const aktionen = element('div', 'aktionen');
+  aktionen.append(likeKnopf, kommentarKnopf);
+  el.append(aktionen);
+
+  const bereich = element('div', 'kommentare');
+  bereich.hidden = true;
+  const liste = element('div');
+  const form = element('form');
+  const input = element('input');
+  input.maxLength = 500;
+  input.required = true;
+  input.placeholder = 'Kommentar …';
+  form.append(input, element('button', '', 'Senden'));
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const { error } = await supabase.from('kommentare')
+      .insert({ idee_id: idee.id, board: idee.board, text: input.value.trim(), name: meinName() });
+    if (error) zeigeFehler(error.message);
+    else input.value = '';
+  });
+  bereich.append(liste, form);
+  el.append(bereich);
+  kommentarKnopf.addEventListener('click', () => { bereich.hidden = !bereich.hidden; });
+
+  karten.set(idee.id, { el, likeKnopf, kommentarKnopf, liste });
+  aktualisiereKarte(idee);
+}
+
+function aktualisiereKarte(idee) {
+  const k = karten.get(idee.id);
+  k.likeKnopf.textContent = '♥ ' + idee.likes.size;
+  k.likeKnopf.classList.toggle('meins', idee.likes.has(person));
+  k.kommentarKnopf.textContent = '💬 ' + idee.kommentare.length;
+}
+
+function zeichne() {
+  for (const f of FRAGEN) {
+    const b = bereiche.get(f.id);
+    const sichtbar = [...ideen.values()]
+      .filter(i => i.frage === f.id)
+      .sort((x, y) => {
+        if (sortierung === 'likes' && y.likes.size !== x.likes.size) return y.likes.size - x.likes.size;
+        return new Date(y.created_at) - new Date(x.created_at);
+      });
+    const ids = new Set(sichtbar.map(i => i.id));
+    for (const el of [...b.container.children]) if (!ids.has(Number(el.dataset.id))) el.remove();
+    sichtbar.forEach((idee, i) => {
+      const el = karten.get(idee.id).el;
+      if (b.container.children[i] !== el) b.container.insertBefore(el, b.container.children[i] || null);
+    });
+    b.keine.hidden = sichtbar.length > 0;
+  }
+}
+
+// ---------- Daten verarbeiten ----------
+function neueIdee(zeile) {
+  const f = frageVonBoard.get(zeile.board);
+  if (!f || ideen.has(zeile.id)) return;
+  const idee = { ...zeile, frage: f.id, likes: new Set(), kommentare: [] };
+  ideen.set(idee.id, idee);
+  karteErstellen(idee);
+}
+
+function ideeEntfernen(id) {
+  const k = karten.get(id);
+  if (k) k.el.remove();
+  karten.delete(id);
+  ideen.delete(id);
+}
+
+function neuerKommentar(zeile) {
+  const idee = ideen.get(zeile.idee_id);
+  if (!idee || idee.kommentare.some(k => k.id === zeile.id)) return;
+  idee.kommentare.push(zeile);
+  const box = element('div', 'kommentar');
+  box.append(element('span', 'wer', (zeile.name || 'Anonym') + ' · ' + zeit(zeile.created_at)));
+  textMitLinks(box, zeile.text);
+  karten.get(idee.id).liste.append(box);
+  aktualisiereKarte(idee);
+}
+
+function likeSetzen(ideeId, wer, an) {
+  const idee = ideen.get(ideeId);
+  if (!idee) return;
+  if (an) idee.likes.add(wer); else idee.likes.delete(wer);
+  aktualisiereKarte(idee);
+  if (sortierung === 'likes') zeichne();
+}
+
+async function likeUmschalten(idee) {
+  const hatteLike = idee.likes.has(person);
+  likeSetzen(idee.id, person, !hatteLike);
+  const { error } = hatteLike
+    ? await supabase.from('likes').delete().eq('idee_id', idee.id).eq('person', person)
+    : await supabase.from('likes').insert({ idee_id: idee.id, person, board: idee.board });
+  if (error) { likeSetzen(idee.id, person, hatteLike); zeigeFehler(error.message); }
+}
+
+function verarbeiteEinstellung(zeile) {
+  if (zeile.fall === 'freigabe') { setzeFreigabe(zeile.beschreibung); return; }
+  const f = FRAGEN.find(f => 'frage-' + f.id === zeile.fall);
+  if (!f) return;
+  const b = bereiche.get(f.id);
+  const t = (zeile.beschreibung || '').trim();
+  b.frageEl.textContent = t || f.titel + ' – noch nicht eingetragen';
+  b.frageEl.classList.toggle('leer', !t);
+  if (b.feld && document.activeElement !== b.feld) b.feld.value = zeile.beschreibung || '';
+}
+
+// ---------- Laden ----------
+baueSortierung();
+anzeigen();
+const [r1, r2, r3, r4] = await Promise.all([
+  supabase.from('ideen').select('*').in('board', alleBoards).order('created_at'),
+  supabase.from('likes').select('idee_id, person').in('board', alleBoards),
+  supabase.from('kommentare').select('*').in('board', alleBoards).order('created_at'),
+  supabase.from('faelle').select('*').eq('board', board),
+]);
+for (const r of [r1, r2, r3, r4]) if (r.error) zeigeFehler(r.error.message);
+(r1.data || []).forEach(neueIdee);
+(r2.data || []).forEach(l => { const i = ideen.get(l.idee_id); if (i) i.likes.add(l.person); });
+(r3.data || []).forEach(neuerKommentar);
+ideen.forEach(aktualisiereKarte);
+(r4.data || []).forEach(verarbeiteEinstellung);
+zeichne();
+
+// ---------- Live-Aktualisierung ----------
+const nurBoards = 'board=in.(' + alleBoards.join(',') + ')';
+supabase.channel('schritte-' + board)
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ideen', filter: nurBoards },
+      p => { neueIdee(p.new); zeichne(); })
+  .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'ideen' },
+      p => { ideeEntfernen(p.old.id); zeichne(); })
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'likes', filter: nurBoards },
+      p => likeSetzen(p.new.idee_id, p.new.person, true))
+  .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'likes' },
+      p => likeSetzen(p.old.idee_id, p.old.person, false))
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'kommentare', filter: nurBoards },
+      p => neuerKommentar(p.new))
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'faelle', filter: 'board=eq.' + board },
+      p => { if (p.new && p.new.fall) verarbeiteEinstellung(p.new); })
+  .subscribe(status => {
+    if (status === 'SUBSCRIBED') $('status').textContent = bearbeitenModus
+      ? '● Live verbunden – Bearbeiten-Modus' : '● Live verbunden';
+    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') $('status').textContent = '○ Keine Live-Verbindung (siehe Teil 6)';
+  });
+</script>
+</body>
+</html>
