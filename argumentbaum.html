@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Argumentbaum</title>
+<style>
+  /* >>> Farben: Graphit <<< */
+  :root {
+    --hintergrund: #f0f2f3;
+    --flaeche:     #ffffff;
+    --text:        #1d2327;
+    --leise:       #5b656c;
+    --rahmen:      #d5dadd;
+    --akzent:      #37474f;
+    --akzent-hell: #e3e7ea;
+    --pro:         #1f7a3d;
+    --pro-hell:    #e3f4e8;
+    --contra:      #b3261e;
+    --contra-hell: #fbe7e5;
+  }
+
+  body { font-family: system-ui, sans-serif; margin: 0; background: var(--hintergrund); color: var(--text); }
+  main { max-width: 1150px; margin: 0 auto; padding: 2rem 1.5rem; }
+  #status { font-size: .9rem; color: var(--leise); margin-bottom: .8rem; }
+  #fehler { background: #fbebeb; color: #a00; padding: .8rem; border-radius: 8px; margin-bottom: 1rem; }
+  .box { background: var(--flaeche); border: 1px solid var(--rahmen); border-radius: 14px;
+         padding: 1.1rem; margin-bottom: 1.5rem; }
+  .steuerung { background: var(--akzent-hell); border: 2px solid var(--akzent); }
+  .steuerung h2 { margin: 0 0 .8rem; font-size: 1.15rem; }
+  textarea, input { box-sizing: border-box; font: inherit; border: 1px solid var(--rahmen); border-radius: 8px;
+                    padding: .5rem .7rem; background: var(--flaeche); color: var(--text); }
+  textarea { width: 100%; min-height: 3.2rem; }
+  textarea:focus, input:focus { outline: 2px solid var(--akzent); outline-offset: 1px; }
+  #name-feld { width: 100%; max-width: 22rem; }
+  .zeile { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-top: .5rem; }
+  button { padding: .5rem 1rem; font-size: 1rem; cursor: pointer; border-radius: 999px;
+           border: 1px solid var(--rahmen); background: var(--flaeche); color: var(--text); }
+  button.klein { padding: .28rem .7rem; font-size: .88rem; }
+  button.haupt, button.aktiv { background: var(--akzent); border-color: var(--akzent); color: #fff; font-weight: 600; }
+  .leise { color: var(--leise); }
+
+  .these { background: var(--akzent); color: #fff; border-radius: 16px; padding: 1.4rem 1.6rem;
+           text-align: center; margin-bottom: 1rem; }
+  .these .titel { text-transform: uppercase; letter-spacing: .08em; font-size: .8rem; font-weight: 700; }
+  #these { font-size: 1.7rem; margin: .4rem 0 0; white-space: pre-wrap; }
+  #these.leer { font-style: italic; font-weight: 400; }
+  #hinweis { text-align: center; color: var(--leise); margin: 0 0 1.2rem; }
+
+  .spalten { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; align-items: start; }
+  @media (max-width: 760px) { .spalten { grid-template-columns: 1fr; } }
+  .spalte { border-radius: 14px; padding: 1rem; }
+  .spalte.pro { background: var(--pro-hell); }
+  .spalte.contra { background: var(--contra-hell); }
+  .spalte h2 { margin: 0 0 .8rem; font-size: 1.2rem; }
+  .spalte.pro h2 { color: var(--pro); }
+  .spalte.contra h2 { color: var(--contra); }
+  .neu-form { display: grid; gap: .4rem; margin-bottom: 1rem; }
+  .spalte.pro .neu-form button { background: var(--pro); border-color: var(--pro); color: #fff; }
+  .spalte.contra .neu-form button { background: var(--contra); border-color: var(--contra); color: #fff; }
+  .keine { color: var(--leise); font-style: italic; }
+
+  .argument { background: var(--flaeche); border-radius: 10px; padding: .75rem .9rem; margin-bottom: .7rem;
+              border-left: 5px solid var(--rahmen); box-shadow: 0 2px 6px rgba(0,0,0,.05); }
+  .argument.pro { border-left-color: var(--pro); }
+  .argument.contra { border-left-color: var(--contra); }
+  .art { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+  .argument.pro > .art { color: var(--pro); }
+  .argument.contra > .art { color: var(--contra); }
+  .text { margin: .2rem 0 .35rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .meta { font-size: .82rem; color: var(--leise); margin-bottom: .5rem; }
+  .aktionen { display: flex; flex-wrap: wrap; gap: .35rem; }
+  .pro-knopf { color: var(--pro); border-color: var(--pro); }
+  .contra-knopf { color: var(--contra); border-color: var(--contra); }
+  .like.meins { background: var(--akzent-hell); border-color: var(--akzent); }
+  .antwort-form { display: grid; gap: .4rem; margin-top: .6rem; padding: .6rem; border-radius: 8px; }
+  .antwort-form.pro { background: var(--pro-hell); }
+  .antwort-form.contra { background: var(--contra-hell); }
+  .antworten { margin-top: .7rem; padding-left: .8rem; border-left: 2px dashed var(--rahmen); }
+  .antworten .argument { box-shadow: none; border: 1px solid var(--rahmen); border-left-width: 5px; }
+  .antworten .argument.pro { border-left-color: var(--pro); }
+  .antworten .argument.contra { border-left-color: var(--contra); }
+
+  .geschlossen .schreiben { display: none !important; }
+  .geschlossen .like { pointer-events: none; }
+</style>
+</head>
+<body>
+<main>
+  <div id="status">Verbinde …</div>
+  <div id="fehler" hidden></div>
+
+  <div class="box steuerung" id="steuerung" hidden>
+    <h2>Argumentbaum steuern</h2>
+    <textarea id="these-feld" placeholder="These, z. B. Hausaufgaben sollten abgeschafft werden."></textarea>
+    <div class="zeile"><button id="these-speichern" class="haupt">These speichern</button></div>
+    <div class="zeile">
+      <span class="leise">Diskussion:</span>
+      <button id="phase-offen" data-phase="offen">Offen</button>
+      <button id="phase-zu" data-phase="geschlossen">Geschlossen</button>
+    </div>
+  </div>
+
+  <div class="these">
+    <div class="titel">These</div>
+    <h1 id="these" class="leer">Noch keine These eingetragen.</h1>
+  </div>
+  <p id="hinweis"></p>
+
+  <div class="box schreiben">
+    <input id="name-feld" maxlength="60" placeholder="Dein Name (optional)">
+  </div>
+
+  <div class="spalten">
+    <div class="spalte pro">
+      <h2>👍 Pro <span class="leise" id="pro-anzahl"></span></h2>
+      <form class="neu-form schreiben" data-art="pro">
+        <textarea maxlength="1000" required placeholder="Argument für die These …"></textarea>
+        <div><button>Pro-Argument hinzufügen</button></div>
+      </form>
+      <p class="keine" id="pro-keine">Noch keine Pro-Argumente.</p>
+      <div id="pro-liste"></div>
+    </div>
+    <div class="spalte contra">
+      <h2>👎 Contra <span class="leise" id="contra-anzahl"></span></h2>
+      <form class="neu-form schreiben" data-art="contra">
+        <textarea maxlength="1000" required placeholder="Argument gegen die These …"></textarea>
+        <div><button>Contra-Argument hinzufügen</button></div>
+      </form>
+      <p class="keine" id="contra-keine">Noch keine Contra-Argumente.</p>
+      <div id="contra-liste"></div>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1/+esm';
+
+// >>> Hier deine beiden Werte aus Teil 3 eintragen <<<
+const supabase = createClient('https://oeqlvlrnflqfevktfyuz.supabase.co', 'sb_publishable_x7jDXG-iMW23TDVUm9HSEA_bDANHESG');
+
+const board = location.hash.slice(1) || 'argumentbaum';
+const bearbeitenModus = new URLSearchParams(location.search).has('bearbeiten');
+const $ = id => document.getElementById(id);
+
+const knoten = new Map();  // Nummer -> Argument mit Karte
+const waisen = new Map();  // Antworten, deren Argument noch nicht geladen ist
+let phase = 'offen';
+let pin = null;
+
+// ---------- Hilfsfunktionen ----------
+function lesen(key) { try { return localStorage.getItem(key); } catch { return null; } }
+function schreiben(key, wert) { try { localStorage.setItem(key, wert); } catch {} }
+
+function zeigeFehler(text) {
+  $('fehler').textContent = 'Fehler: ' + text;
+  $('fehler').hidden = false;
+}
+
+function element(tag, klasse, text) {
+  const el = document.createElement(tag);
+  if (klasse) el.className = klasse;
+  if (text) el.textContent = text;
+  return el;
+}
+
+function zeit(datum) {
+  return new Date(datum).toLocaleString('de-AT', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+async function mitPin(aktion) {
+  if (!pin) pin = prompt('Bitte deinen PIN eingeben:');
+  if (!pin) return false;
+  const { error } = await aktion(pin);
+  if (error) { pin = null; zeigeFehler(error.message); return false; }
+  return true;
+}
+
+let person = lesen('ideen-person');
+if (!person) {
+  person = Date.now().toString(36) + Math.random().toString(36).slice(2);
+  schreiben('ideen-person', person);
+}
+$('name-feld').value = lesen('ideen-name') || '';
+$('name-feld').addEventListener('input', () => schreiben('ideen-name', $('name-feld').value));
+const meinName = () => $('name-feld').value.trim() || null;
+
+async function argumentSpeichern(text, art, parentId) {
+  const { error } = await supabase.from('ideen')
+    .insert({ board, text, name: meinName(), art, parent_id: parentId });
+  if (error) { zeigeFehler(error.message); return false; }
+  return true;
+}
+
+// ---------- Formulare für die oberste Ebene ----------
+for (const form of document.querySelectorAll('.neu-form')) {
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const feld = form.querySelector('textarea');
+    const text = feld.value.trim();
+    if (text && await argumentSpeichern(text, form.dataset.art, null)) feld.value = '';
+  });
+}
+
+// ---------- Argument-Karten ----------
+function zaehleAnzeige(n) {
+  const c = n.kinder.size;
+  n.antwortenKnopf.hidden = c === 0;
+  n.antwortenKnopf.textContent = (n.liste.hidden ? '▸ ' : '▾ ') + c + (c === 1 ? ' Antwort' : ' Antworten');
+}
+
+function aktualisiereLike(n) {
+  n.likeKnopf.textContent = '👍 überzeugend · ' + n.likes.size;
+  n.likeKnopf.classList.toggle('meins', n.likes.has(person));
+}
+
+function karteErstellen(z) {
+  const el = element('div', 'argument ' + z.art);
+  el.append(element('span', 'art', z.art === 'pro' ? 'Pro' : 'Contra'));
+  el.append(element('p', 'text', z.text));
+  el.append(element('div', 'meta', (z.name || 'Anonym') + ' · ' + zeit(z.created_at)));
+
+  const aktionen = element('div', 'aktionen');
+  const likeKnopf = element('button', 'klein like');
+  const proKnopf = element('button', 'klein schreiben pro-knopf', '+ Pro');
+  const contraKnopf = element('button', 'klein schreiben contra-knopf', '+ Contra');
+  const antwortenKnopf = element('button', 'klein');
+  aktionen.append(likeKnopf, proKnopf, contraKnopf, antwortenKnopf);
+  el.append(aktionen);
+
+  const form = element('form', 'antwort-form schreiben');
+  form.hidden = true;
+  const feld = element('textarea');
+  feld.maxLength = 1000;
+  feld.required = true;
+  const abbrechen = element('button', 'klein', 'Abbrechen');
+  abbrechen.type = 'button';
+  const zeile = element('div', 'zeile');
+  zeile.append(element('button', 'klein haupt', 'Senden'), abbrechen);
+  form.append(feld, zeile);
+  el.append(form);
+
+  const liste = element('div', 'antworten');
+  liste.hidden = true;
+  el.append(liste);
+
+  const n = { daten: z, likes: new Set(), kinder: new Set(), el, likeKnopf, antwortenKnopf, liste, formArt: 'pro' };
+
+  function oeffneForm(art) {
+    n.formArt = art;
+    form.className = 'antwort-form schreiben ' + art;
+    feld.placeholder = art === 'pro' ? 'Argument, das diese Aussage stützt …' : 'Argument, das dieser Aussage widerspricht …';
+    form.hidden = false;
+    feld.focus();
+  }
+  proKnopf.addEventListener('click', () => oeffneForm('pro'));
+  contraKnopf.addEventListener('click', () => oeffneForm('contra'));
+  abbrechen.addEventListener('click', () => { form.hidden = true; });
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const text = feld.value.trim();
+    if (text && await argumentSpeichern(text, n.formArt, z.id)) {
+      feld.value = '';
+      form.hidden = true;
+      liste.hidden = false;
+      zaehleAnzeige(n);
+    }
+  });
+  antwortenKnopf.addEventListener('click', () => { liste.hidden = !liste.hidden; zaehleAnzeige(n); });
+  likeKnopf.addEventListener('click', () => likeUmschalten(n));
+
+  aktualisiereLike(n);
+  zaehleAnzeige(n);
+  return n;
+}
+
+function aktualisiereZaehler() {
+  let pro = 0, contra = 0;
+  for (const n of knoten.values()) {
+    if (n.daten.parent_id) continue;
+    if (n.daten.art === 'pro') pro++; else contra++;
+  }
+  $('pro-anzahl').textContent = '(' + pro + ')';
+  $('contra-anzahl').textContent = '(' + contra + ')';
+  $('pro-keine').hidden = pro > 0;
+  $('contra-keine').hidden = contra > 0;
+}
+
+// ---------- Daten verarbeiten ----------
+function neuesArgument(z) {
+  if (z.board !== board || !z.art || knoten.has(z.id)) return;
+  if (z.parent_id && !knoten.has(z.parent_id)) {
+    if (!waisen.has(z.parent_id)) waisen.set(z.parent_id, []);
+    waisen.get(z.parent_id).push(z);
+    return;
+  }
+  const n = karteErstellen(z);
+  knoten.set(z.id, n);
+  if (z.parent_id) {
+    const eltern = knoten.get(z.parent_id);
+    eltern.kinder.add(z.id);
+    eltern.liste.append(n.el);
+    zaehleAnzeige(eltern);
+  } else {
+    $(z.art === 'pro' ? 'pro-liste' : 'contra-liste').append(n.el);
+  }
+  const wartend = waisen.get(z.id);
+  if (wartend) { waisen.delete(z.id); wartend.forEach(neuesArgument); }
+  aktualisiereZaehler();
+}
+
+function argumentEntfernen(id) {
+  const n = knoten.get(id);
+  if (!n) return;
+  for (const kind of [...n.kinder]) argumentEntfernen(kind);
+  n.el.remove();
+  knoten.delete(id);
+  const eltern = knoten.get(n.daten.parent_id);
+  if (eltern) { eltern.kinder.delete(id); zaehleAnzeige(eltern); }
+  aktualisiereZaehler();
+}
+
+function likeSetzen(id, wer, an) {
+  const n = knoten.get(id);
+  if (!n) return;
+  if (an) n.likes.add(wer); else n.likes.delete(wer);
+  aktualisiereLike(n);
+}
+
+async function likeUmschalten(n) {
+  if (phase === 'geschlossen') return;
+  const id = n.daten.id;
+  const hatteLike = n.likes.has(person);
+  likeSetzen(id, person, !hatteLike);
+  const { error } = hatteLike
+    ? await supabase.from('likes').delete().eq('idee_id', id).eq('person', person)
+    : await supabase.from('likes').insert({ idee_id: id, person, board });
+  if (error) { likeSetzen(id, person, hatteLike); zeigeFehler(error.message); }
+}
+
+function verarbeiteEinstellung(z) {
+  if (z.fall === 'frage') {
+    const t = (z.beschreibung || '').trim();
+    $('these').textContent = t || 'Noch keine These eingetragen.';
+    $('these').classList.toggle('leer', !t);
+    if (bearbeitenModus && document.activeElement !== $('these-feld')) $('these-feld').value = z.beschreibung || '';
+  } else if (z.fall === 'phase') {
+    phase = z.beschreibung === 'geschlossen' ? 'geschlossen' : 'offen';
+    document.body.classList.toggle('geschlossen', phase === 'geschlossen');
+    $('hinweis').textContent = phase === 'geschlossen'
+      ? 'Die Diskussion ist geschlossen.'
+      : 'Stütze oder widerlege die These – oder antworte auf ein einzelnes Argument.';
+    $('phase-offen').classList.toggle('aktiv', phase === 'offen');
+    $('phase-zu').classList.toggle('aktiv', phase === 'geschlossen');
+  }
+}
+
+// ---------- Bearbeiten-Modus ----------
+function einstellungSpeichern(fall, text) {
+  return mitPin(p => supabase.rpc('fall_speichern', { p_board: board, p_fall: fall, p_text: text, p_pin: p }));
+}
+
+if (bearbeitenModus) {
+  $('steuerung').hidden = false;
+  $('these-speichern').addEventListener('click', async () => {
+    const text = $('these-feld').value;
+    if (await einstellungSpeichern('frage', text)) {
+      verarbeiteEinstellung({ fall: 'frage', beschreibung: text });
+      $('these-speichern').textContent = 'Gespeichert ✓';
+      setTimeout(() => { $('these-speichern').textContent = 'These speichern'; }, 2000);
+    }
+  });
+  for (const knopf of [$('phase-offen'), $('phase-zu')]) {
+    knopf.addEventListener('click', async () => {
+      const neu = knopf.dataset.phase;
+      if (await einstellungSpeichern('phase', neu)) verarbeiteEinstellung({ fall: 'phase', beschreibung: neu });
+    });
+  }
+}
+
+// ---------- Laden ----------
+verarbeiteEinstellung({ fall: 'phase', beschreibung: 'offen' });
+aktualisiereZaehler();
+const [r1, r2, r3] = await Promise.all([
+  supabase.from('ideen').select('*').eq('board', board).order('created_at'),
+  supabase.from('likes').select('idee_id, person').eq('board', board),
+  supabase.from('faelle').select('*').eq('board', board),
+]);
+for (const r of [r1, r2, r3]) if (r.error) zeigeFehler(r.error.message);
+(r1.data || []).forEach(neuesArgument);
+(r2.data || []).forEach(l => likeSetzen(l.idee_id, l.person, true));
+(r3.data || []).forEach(verarbeiteEinstellung);
+
+// ---------- Live-Aktualisierung ----------
+const nurBoard = 'board=eq.' + board;
+supabase.channel('baum-' + board)
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ideen', filter: nurBoard },
+      p => neuesArgument(p.new))
+  .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'ideen' },
+      p => argumentEntfernen(p.old.id))
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'likes', filter: nurBoard },
+      p => likeSetzen(p.new.idee_id, p.new.person, true))
+  .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'likes' },
+      p => likeSetzen(p.old.idee_id, p.old.person, false))
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'faelle', filter: nurBoard },
+      p => { if (p.new && p.new.fall) verarbeiteEinstellung(p.new); })
+  .subscribe(status => {
+    if (status === 'SUBSCRIBED') $('status').textContent = bearbeitenModus
+      ? '● Live verbunden – Bearbeiten-Modus' : '● Live verbunden';
+    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') $('status').textContent = '○ Keine Live-Verbindung (siehe Teil 6)';
+  });
+</script>
+</body>
+</html>
