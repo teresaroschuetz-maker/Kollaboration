@@ -5,84 +5,415 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pinnwand</title>
 <style>
-  body { font-family: system-ui, sans-serif; margin: 2rem; background: #f4f1ea; }
-  form { display: flex; gap: .5rem; margin-bottom: 1rem; }
-  input { flex: 1; padding: .6rem; font-size: 1rem; }
-  button { padding: .6rem 1rem; font-size: 1rem; }
-  #status { font-size: .9rem; color: #666; margin-bottom: 1rem; }
-  #fehler { background: #fbebeb; color: #a00; padding: .8rem; border-radius: 6px; margin-bottom: 1rem; }
-  #wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; }
-  .note { background: #fff59d; padding: 1rem; border-radius: 6px;
-          box-shadow: 0 2px 4px rgba(0,0,0,.15); white-space: pre-wrap; }
-    /* >>> Farbdesign Pinnwand: Sonnengelb <<< */
-  body { background: #fff6db; color: #2b2410; }
-  h1 { color: #6b4e00; }
-  #status { color: #6b5a2e; }
-  input { border: 1px solid #e3cf94; border-radius: 8px; background: #fff; }
-  button { padding: .6rem 1.1rem; font-size: 1rem; background: #8a6100; color: #fff;
-           border: none; border-radius: 999px; cursor: pointer; }
-  .note { color: #2b2410; border-radius: 10px; box-shadow: 0 3px 8px rgba(80,60,0,.15); }
+  /* >>> Farben: Sonnengelb <<< */
+  :root {
+    --hintergrund: #fff6db;
+    --flaeche:     #ffffff;
+    --text:        #2b2410;
+    --leise:       #6b5a2e;
+    --rahmen:      #e3cf94;
+    --akzent:      #8a6100;
+    --akzent-hell: #fdecb8;
+  }
+
+  body { font-family: system-ui, sans-serif; margin: 0; background: var(--hintergrund); color: var(--text); }
+  main { max-width: 1300px; margin: 0 auto; padding: 1.5rem; }
+  #status { font-size: .9rem; color: var(--leise); margin-bottom: .6rem; }
+  #fehler { background: #fbebeb; color: #a00; padding: .8rem; border-radius: 8px; margin-bottom: 1rem; }
+  h1 { color: #6b4e00; margin: .3rem 0 1rem; white-space: pre-wrap; }
+  .box { background: var(--flaeche); border: 1px solid var(--rahmen); border-radius: 14px; padding: 1rem;
+         margin-bottom: 1.5rem; display: grid; gap: .6rem; }
+  .steuerung { background: var(--akzent-hell); border: 2px solid var(--akzent); }
+  .box.ziel { outline: 3px dashed var(--akzent); outline-offset: 3px; }
+  textarea, input { box-sizing: border-box; font: inherit; padding: .55rem .7rem; color: var(--text);
+                    border: 1px solid var(--rahmen); border-radius: 8px; background: #fff; }
+  textarea { width: 100%; min-height: 4rem; }
+  textarea:focus, input:focus { outline: 2px solid var(--akzent); outline-offset: 1px; }
+  .zeile { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+  .zeile input { flex: 1; min-width: 12rem; }
+  button { padding: .5rem 1rem; font-size: 1rem; cursor: pointer; border-radius: 999px;
+           border: 1px solid var(--rahmen); background: #fff; color: var(--text); }
+  button.haupt { background: var(--akzent); border-color: var(--akzent); color: #fff; font-weight: 600; }
+  button:disabled { opacity: .5; cursor: default; }
+  .hinweis { font-size: .85rem; color: var(--leise); margin: 0; }
+  #anhang { display: flex; align-items: center; gap: .6rem; background: var(--akzent-hell);
+            border-radius: 8px; padding: .4rem .6rem; }
+  #anhang[hidden] { display: none; }
+  #anhang img { height: 48px; border-radius: 4px; }
+  #anhang button { padding: .1rem .55rem; font-size: .85rem; }
+
+  #wand { columns: 280px; column-gap: 1rem; }
+  .beitrag { break-inside: avoid; display: inline-block; width: 100%; box-sizing: border-box; margin-bottom: 1rem;
+             padding: .9rem; border-radius: 10px; box-shadow: 0 3px 8px rgba(80,60,0,.15); color: var(--text); }
+  .beitrag img.bild { display: block; width: 100%; border-radius: 6px; margin-bottom: .6rem; cursor: zoom-in; background: #fff; }
+  .beitrag .text { margin: 0 0 .5rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .beitrag a { color: #1d4f8a; overflow-wrap: anywhere; }
+  .anlage { display: block; background: rgba(255,255,255,.75); border-radius: 6px; padding: .4rem .6rem;
+            margin-bottom: .5rem; text-decoration: none; font-weight: 600; }
+  .meta { font-size: .82rem; color: #4d4430; margin-bottom: .4rem; }
+  .kommentar-knopf { padding: .25rem .7rem; font-size: .88rem; background: rgba(255,255,255,.8); }
+  .kommentare { margin-top: .6rem; border-top: 1px solid rgba(0,0,0,.12); padding-top: .5rem; }
+  .kommentar { font-size: .9rem; background: rgba(255,255,255,.8); border-radius: 6px; padding: .4rem .55rem;
+               margin-bottom: .35rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .kommentar .wer { display: block; font-size: .78rem; color: #4d4430; }
+  .kommentare form { display: flex; gap: .35rem; }
+  .kommentare input { flex: 1; min-width: 0; padding: .35rem .5rem; font-size: .92rem; }
+  .kommentare form button { padding: .3rem .7rem; font-size: .9rem; }
+  #leer { color: var(--leise); font-style: italic; }
+
+  #gross { position: fixed; inset: 0; background: rgba(30,25,10,.85); display: flex; align-items: center;
+           justify-content: center; padding: 1.5rem; z-index: 20; cursor: zoom-out; }
+  #gross[hidden] { display: none; }
+  #gross img { max-width: 100%; max-height: 100%; border-radius: 8px; background: #fff; }
 </style>
 </head>
 <body>
-<h1>Pinnwand</h1>
-<form id="form">
-  <input id="input" maxlength="500" placeholder="Neuer Beitrag …" required>
-  <button>Anheften</button>
-</form>
-<div id="status">Verbinde …</div>
-<div id="fehler" hidden></div>
-<div id="wall"></div>
+<main>
+  <div id="status">Verbinde …</div>
+  <div id="fehler" hidden></div>
+
+  <div class="box steuerung" id="steuerung" hidden>
+    <strong>Überschrift oder Arbeitsauftrag</strong>
+    <textarea id="thema-feld" placeholder="z. B. Teilt hier Quellen zum Thema Inklusion"></textarea>
+    <div class="zeile"><button id="thema-speichern" class="haupt">Speichern</button></div>
+  </div>
+
+  <h1 id="thema">Pinnwand</h1>
+
+  <div class="box" id="neu">
+    <input id="name-feld" maxlength="60" placeholder="Dein Name (optional)">
+    <textarea id="text-feld" maxlength="1000" placeholder="Dein Beitrag … (Bilder auch mit Cmd+V einfügen)"></textarea>
+    <input id="link-feld" maxlength="500" placeholder="Link (optional), z. B. https://…">
+    <div id="anhang" hidden></div>
+    <div class="zeile">
+      <button id="datei-knopf">📎 Bild oder Datei</button>
+      <input type="file" id="datei-feld" hidden
+             accept="image/*,.pdf,.txt,.doc,.docx,.ppt,.pptx,.xls,.xlsx">
+      <button id="senden" class="haupt">Anheften</button>
+    </div>
+    <p class="hinweis">Erlaubt: Bilder, PDF, Word, PowerPoint, Excel und Text, höchstens 10 MB.</p>
+  </div>
+
+  <p id="leer">Noch keine Beiträge.</p>
+  <div id="wand"></div>
+</main>
+<div id="gross" hidden><img alt="Bild in groß"></div>
 
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1/+esm';
+
+// >>> Einstellungen <<<
+const ZETTELFARBEN = ['#fff59d', '#c8f0c8', '#c9e4ff', '#ffd6e0', '#ffe0b2', '#e1d5ff'];
+const MAX_MB = 10;           // größte Datei in MB (höchstens so viel wie im SQL erlaubt)
+const BILD_PIXEL = 1600;     // Bilder werden auf diese Größe verkleinert
 
 // >>> Hier deine beiden Werte aus Teil 3 eintragen <<<
 const supabase = createClient('https://oeqlvlrnflqfevktfyuz.supabase.co', 'sb_publishable_x7jDXG-iMW23TDVUm9HSEA_bDANHESG');
 
 const board = location.hash.slice(1) || 'start';
-const wall = document.getElementById('wall');
-const ZETTELFARBEN = ['#fff59d', '#c8f0c8', '#c9e4ff', '#ffd6e0', '#ffe0b2', '#e1d5ff'];
-const statusBox = document.getElementById('status');
+const bearbeitenModus = new URLSearchParams(location.search).has('bearbeiten');
+const $ = id => document.getElementById(id);
+const beitraege = new Map();   // Schlüssel -> { daten, el, liste, knopf, kommentare }
+let anhang = null;
+let pin = null;
+
+// ---------- Hilfsfunktionen ----------
+function lesen(key) { try { return localStorage.getItem(key); } catch { return null; } }
+function schreiben(key, wert) { try { localStorage.setItem(key, wert); } catch {} }
 
 function zeigeFehler(text) {
-  const box = document.getElementById('fehler');
-  box.textContent = 'Fehler: ' + text;
-  box.hidden = false;
+  $('fehler').textContent = 'Fehler: ' + text;
+  $('fehler').hidden = false;
 }
 
-function addNote(note) {
-  const div = document.createElement('div');
-  div.className = 'note';
-  div.style.background = ZETTELFARBEN[note.id % ZETTELFARBEN.length];
-  div.textContent = note.text;
-  wall.prepend(div);
+function element(tag, klasse, text) {
+  const el = document.createElement(tag);
+  if (klasse) el.className = klasse;
+  if (text) el.textContent = text;
+  return el;
 }
 
-// 1. Vorhandene Zettel laden
-const { data, error } = await supabase.from('notes')
-  .select('*').eq('board', board).order('created_at');
-if (error) zeigeFehler(error.message);
-else data.forEach(addNote);
+function zeit(datum) {
+  return new Date(datum).toLocaleString('de-AT', { dateStyle: 'short', timeStyle: 'short' });
+}
 
-// 2. Neue Zettel live empfangen
-supabase.channel('wall-' + board)
-  .on('postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'notes', filter: 'board=eq.' + board },
-      payload => addNote(payload.new))
-  .subscribe(status => {
-    if (status === 'SUBSCRIBED') statusBox.textContent = '● Live verbunden – Pinnwand: ' + board;
-    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') statusBox.textContent = '○ Keine Live-Verbindung (siehe Teil 6)';
+function textMitLinks(el, text) {
+  text.split(/(https?:\/\/[^\s]+)/g).forEach((teil, i) => {
+    if (i % 2 === 1) {
+      const a = element('a', '', teil);
+      a.href = teil;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      el.append(a);
+    } else if (teil) {
+      el.append(teil);
+    }
   });
+}
 
-// 3. Neuen Zettel speichern
-document.getElementById('form').addEventListener('submit', async e => {
-  e.preventDefault();
-  const input = document.getElementById('input');
-  const { error } = await supabase.from('notes').insert({ board, text: input.value });
-  if (error) zeigeFehler(error.message);
-  else input.value = '';
+function istBild(typ) { return typeof typ === 'string' && typ.startsWith('image/'); }
+
+$('name-feld').value = lesen('ideen-name') || '';
+$('name-feld').addEventListener('input', () => schreiben('ideen-name', $('name-feld').value));
+const meinName = () => $('name-feld').value.trim() || null;
+
+$('gross').addEventListener('click', () => { $('gross').hidden = true; });
+function zeigeGross(src) {
+  $('gross').querySelector('img').src = src;
+  $('gross').hidden = false;
+}
+
+// ---------- Anhang wählen ----------
+function setzeAnhang(datei) {
+  anhang = datei;
+  const box = $('anhang');
+  box.replaceChildren();
+  box.hidden = !datei;
+  if (!datei) return;
+  if (istBild(datei.type)) {
+    const vorschau = element('img');
+    vorschau.src = URL.createObjectURL(datei);
+    box.append(vorschau);
+  }
+  box.append(element('span', '', '📎 ' + (datei.name || 'Bild')));
+  const weg = element('button', '', '✕');
+  weg.title = 'Anhang entfernen';
+  weg.addEventListener('click', () => setzeAnhang(null));
+  box.append(weg);
+}
+
+$('datei-knopf').addEventListener('click', () => $('datei-feld').click());
+$('datei-feld').addEventListener('change', () => {
+  if ($('datei-feld').files[0]) setzeAnhang($('datei-feld').files[0]);
+  $('datei-feld').value = '';
 });
+$('text-feld').addEventListener('paste', e => {
+  const bild = [...(e.clipboardData ? e.clipboardData.files : [])].find(f => istBild(f.type));
+  if (!bild) return;
+  e.preventDefault();
+  setzeAnhang(bild);
+});
+$('neu').addEventListener('dragover', e => { e.preventDefault(); $('neu').classList.add('ziel'); });
+$('neu').addEventListener('dragleave', () => $('neu').classList.remove('ziel'));
+$('neu').addEventListener('drop', e => {
+  e.preventDefault();
+  $('neu').classList.remove('ziel');
+  if (e.dataTransfer.files[0]) setzeAnhang(e.dataTransfer.files[0]);
+});
+
+// ---------- Hochladen ----------
+function bildVerkleinern(datei) {
+  return new Promise((fertig, fehler) => {
+    const url = URL.createObjectURL(datei);
+    const img = new Image();
+    img.onload = () => {
+      const faktor = Math.min(1, BILD_PIXEL / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * faktor);
+      c.height = Math.round(img.height * faktor);
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(blob => blob ? fertig(blob) : fehler(new Error('Das Bild konnte nicht verkleinert werden.')), 'image/jpeg', 0.85);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); fehler(new Error('Das Bild konnte nicht gelesen werden.')); };
+    img.src = url;
+  });
+}
+
+async function hochladen(datei) {
+  let inhalt = datei;
+  let typ = datei.type || 'application/octet-stream';
+  let name = datei.name || 'bild.png';
+  if (istBild(typ) && typ !== 'image/gif') {
+    inhalt = await bildVerkleinern(datei);
+    typ = 'image/jpeg';
+    name = name.replace(/\.[^.]+$/, '') + '.jpg';
+  }
+  if (inhalt.size > MAX_MB * 1024 * 1024) throw new Error('Die Datei ist größer als ' + MAX_MB + ' MB.');
+  const sicher = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
+  const pfad = board + '/' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7) + '-' + sicher;
+  const { error } = await supabase.storage.from('pinnwand').upload(pfad, inhalt, { contentType: typ });
+  if (error) throw error;
+  const { data } = supabase.storage.from('pinnwand').getPublicUrl(pfad);
+  return { datei_url: data.publicUrl, datei_name: name.slice(0, 200), datei_typ: typ };
+}
+
+// ---------- Beitrag anheften ----------
+$('senden').addEventListener('click', async () => {
+  const text = $('text-feld').value.trim();
+  let link = $('link-feld').value.trim();
+  if (link && !/^https?:\/\//i.test(link)) link = 'https://' + link;
+  if (!text && !link && !anhang) return;
+  const knopf = $('senden');
+  knopf.disabled = true;
+  knopf.textContent = anhang ? 'Wird hochgeladen …' : 'Wird angeheftet …';
+  try {
+    const datei = anhang ? await hochladen(anhang) : {};
+    const { error } = await supabase.from('ideen')
+      .insert({ board, text, name: meinName(), link: link || null, ...datei });
+    if (error) throw error;
+    $('text-feld').value = '';
+    $('link-feld').value = '';
+    setzeAnhang(null);
+  } catch (err) {
+    zeigeFehler(err.message);
+  }
+  knopf.disabled = false;
+  knopf.textContent = 'Anheften';
+});
+
+// ---------- Beiträge anzeigen ----------
+function karteErstellen(schluessel, p, mitKommentaren) {
+  const el = element('div', 'beitrag');
+  el.style.background = ZETTELFARBEN[p.id % ZETTELFARBEN.length];
+
+  if (p.datei_url && istBild(p.datei_typ)) {
+    const img = element('img', 'bild');
+    img.src = p.datei_url;
+    img.alt = p.datei_name || 'Bild';
+    img.loading = 'lazy';
+    img.addEventListener('click', () => zeigeGross(p.datei_url));
+    el.append(img);
+  }
+  if (p.text && p.text.trim()) {
+    const text = element('p', 'text');
+    textMitLinks(text, p.text.trim());
+    el.append(text);
+  }
+  if (p.link) {
+    let ziel = p.link;
+    try { ziel = new URL(p.link).hostname.replace(/^www\./, ''); } catch {}
+    const a = element('a', 'anlage', '🔗 ' + ziel);
+    a.href = p.link;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    el.append(a);
+  }
+  if (p.datei_url && !istBild(p.datei_typ)) {
+    const a = element('a', 'anlage', '📎 ' + (p.datei_name || 'Datei'));
+    a.href = p.datei_url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    el.append(a);
+  }
+  el.append(element('div', 'meta', (p.name || 'Anonym') + ' · ' + zeit(p.created_at)));
+
+  const eintrag = { daten: p, el, kommentare: new Set(), liste: null, knopf: null };
+  if (mitKommentaren) {
+    const knopf = element('button', 'kommentar-knopf');
+    const bereich = element('div', 'kommentare');
+    bereich.hidden = true;
+    const liste = element('div');
+    const form = element('form');
+    const input = element('input');
+    input.maxLength = 500;
+    input.required = true;
+    input.placeholder = 'Kommentar …';
+    form.append(input, element('button', '', 'Senden'));
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const { error } = await supabase.from('kommentare')
+        .insert({ idee_id: p.id, board, text: input.value.trim(), name: meinName() });
+      if (error) zeigeFehler(error.message); else input.value = '';
+    });
+    bereich.append(liste, form);
+    knopf.addEventListener('click', () => { bereich.hidden = !bereich.hidden; });
+    el.append(knopf, bereich);
+    eintrag.liste = liste;
+    eintrag.knopf = knopf;
+  }
+  beitraege.set(schluessel, eintrag);
+  aktualisiereKnopf(eintrag);
+  return el;
+}
+
+function aktualisiereKnopf(e) {
+  if (e.knopf) e.knopf.textContent = '💬 ' + e.kommentare.size + (e.kommentare.size === 1 ? ' Kommentar' : ' Kommentare');
+}
+
+function neuerBeitrag(p, alt = false, oben = true) {
+  const schluessel = (alt ? 'n' : 'i') + p.id;
+  if (p.board !== board || beitraege.has(schluessel)) return;
+  const el = karteErstellen(schluessel, p, !alt);
+  if (oben) $('wand').prepend(el); else $('wand').append(el);
+  $('leer').hidden = true;
+}
+
+function beitragEntfernen(schluessel) {
+  const e = beitraege.get(schluessel);
+  if (e) e.el.remove();
+  beitraege.delete(schluessel);
+  $('leer').hidden = beitraege.size > 0;
+}
+
+function neuerKommentar(k) {
+  const e = beitraege.get('i' + k.idee_id);
+  if (!e || !e.liste || e.kommentare.has(k.id)) return;
+  e.kommentare.add(k.id);
+  const box = element('div', 'kommentar');
+  box.append(element('span', 'wer', (k.name || 'Anonym') + ' · ' + zeit(k.created_at)));
+  textMitLinks(box, k.text);
+  e.liste.append(box);
+  aktualisiereKnopf(e);
+}
+
+// ---------- Überschrift ----------
+function zeigeThema(text) {
+  const t = (text || '').trim();
+  $('thema').textContent = t || 'Pinnwand';
+  if (bearbeitenModus && document.activeElement !== $('thema-feld')) $('thema-feld').value = text || '';
+}
+
+if (bearbeitenModus) {
+  $('steuerung').hidden = false;
+  $('thema-speichern').addEventListener('click', async () => {
+    if (!pin) pin = prompt('Bitte deinen PIN eingeben:');
+    if (!pin) return;
+    const text = $('thema-feld').value;
+    const { error } = await supabase.rpc('fall_speichern', { p_board: board, p_fall: 'frage', p_text: text, p_pin: pin });
+    if (error) { pin = null; zeigeFehler(error.message); return; }
+    zeigeThema(text);
+    $('thema-speichern').textContent = 'Gespeichert ✓';
+    setTimeout(() => { $('thema-speichern').textContent = 'Speichern'; }, 2000);
+  });
+}
+
+// ---------- Laden ----------
+const [r1, r2, r3, r4] = await Promise.all([
+  supabase.from('ideen').select('*').eq('board', board),
+  supabase.from('notes').select('*').eq('board', board).eq('kachel', 'allgemein'),
+  supabase.from('kommentare').select('*').eq('board', board).order('created_at'),
+  supabase.from('faelle').select('*').eq('board', board).eq('fall', 'frage'),
+]);
+for (const r of [r1, r2, r3, r4]) if (r.error) zeigeFehler(r.error.message);
+const alle = [
+  ...(r1.data || []).map(p => ({ p, alt: false })),
+  ...(r2.data || []).map(p => ({ p, alt: true })),
+].sort((a, b) => new Date(b.p.created_at) - new Date(a.p.created_at));
+alle.forEach(({ p, alt }) => neuerBeitrag(p, alt, false));
+(r3.data || []).forEach(neuerKommentar);
+if (r4.data && r4.data[0]) zeigeThema(r4.data[0].beschreibung);
+$('leer').hidden = beitraege.size > 0;
+
+// ---------- Live-Aktualisierung ----------
+const nurBoard = 'board=eq.' + board;
+supabase.channel('pinnwand-' + board)
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ideen', filter: nurBoard },
+      p => neuerBeitrag(p.new))
+  .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'ideen' },
+      p => beitragEntfernen('i' + p.old.id))
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'kommentare', filter: nurBoard },
+      p => neuerKommentar(p.new))
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'faelle', filter: nurBoard },
+      p => { if (p.new && p.new.fall === 'frage') zeigeThema(p.new.beschreibung); })
+  .subscribe(status => {
+    if (status === 'SUBSCRIBED') $('status').textContent = bearbeitenModus
+      ? '● Live verbunden – Bearbeiten-Modus' : '● Live verbunden';
+    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') $('status').textContent = '○ Keine Live-Verbindung (siehe Teil 6)';
+  });
 </script>
 </body>
 </html>
