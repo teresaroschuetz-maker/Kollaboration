@@ -36,13 +36,22 @@
   .label { display: inline-block; font-size: .8rem; font-weight: 600; color: #fff; background: var(--farbe);
            border-radius: 999px; padding: .15rem .6rem; margin-bottom: .5rem; }
   .ideetext { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 0 .7rem; }
-  .meta { font-size: .85rem; color: #777; margin-bottom: .6rem; }
-  .aktionen { display: flex; gap: .4rem; }
+  .ideetext[hidden] { display: none; }
+  .meta { font-size: .85rem; color: #666; margin-bottom: .6rem; }
+  .aktionen { display: flex; gap: .4rem; flex-wrap: wrap; }
+  .aktionen .klein { padding: .35rem .6rem; }
+  .aktionen .entf { color: #8a1c14; }
   .like.meins { background: #fde2e4; border-color: #e05a6b; }
+  .bearbeiten-form { display: grid; gap: .4rem; margin: 0 0 .7rem; }
+  .bearbeiten-form button { padding: .3rem .8rem; font-size: .9rem; }
   .kommentare { margin-top: .8rem; border-top: 1px solid #eee; padding-top: .6rem; }
-  .kommentar { font-size: .92rem; background: #f6f6f6; border-radius: 6px; padding: .45rem .6rem;
-               margin-bottom: .4rem; white-space: pre-wrap; overflow-wrap: anywhere; }
-  .kommentar .wer { display: block; font-size: .8rem; color: #777; }
+  .kommentar { position: relative; font-size: .92rem; background: #f6f6f6; border-radius: 6px;
+               padding: .45rem 3.4rem .45rem .6rem; margin-bottom: .4rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .kommentar .wer { display: block; font-size: .8rem; color: #666; }
+  .kommentar .bearb, .kommentar .entf { position: absolute; top: .2rem; padding: 0 .35rem; font-size: .85rem;
+                                       background: transparent; border: none; }
+  .kommentar .bearb { right: 1.7rem; }
+  .kommentar .entf { right: .25rem; color: #8a1c14; }
   .kommentare form { display: flex; gap: .4rem; }
   .kommentare input { flex: 1; min-width: 0; padding: .4rem; font-size: .95rem; }
     /* >>> Farbdesign Ideen zu mehreren Fragen: Mint <<< */
@@ -54,19 +63,8 @@
   button.haupt, .chip.aktiv { background: #1f7a52; border-color: #1f7a52; color: #fff; }
   .like.meins { background: #fde2ec; border-color: #c2185b; }
   .kommentar { background: #f1faf5; }
-      /* >>> Fragen nebeneinander als Spalten <<< */
-  main { max-width: none; }
-  #fragen { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(300px, 1fr);
-            gap: 1.2rem; align-items: start; overflow-x: auto; padding-bottom: 1rem; }
-  .frage-bereich { margin: 0; padding: 1rem; border: 1px solid rgba(0,0,0,.12);
-                   border-radius: 14px; background: rgba(255,255,255,.55); }
-  .frage { font-size: 1.2rem; }
-  .neu { box-shadow: none; }
-  .ideen { grid-template-columns: 1fr; }
-  @media (max-width: 700px) {
-    #fragen { grid-auto-flow: row; grid-auto-columns: auto; }
-  }
-    /* >>> Jede Frage in einer eigenen Farbe <<< */
+  spalten:    { name: 'Ideen in Spalten', datei: 'ideen-spalten.html', bearbeiten: true },
+      /* >>> Jede Frage in einer eigenen Farbe <<< */
   #fragen > .frage-bereich:nth-child(6n+1) { --spalte: #1d5fa8; --spalte-hell: #e3eefb; }
   #fragen > .frage-bereich:nth-child(6n+2) { --spalte: #1f7a3d; --spalte-hell: #e3f4e8; }
   #fragen > .frage-bereich:nth-child(6n+3) { --spalte: #a14a00; --spalte-hell: #fdeedd; }
@@ -95,7 +93,7 @@
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1/+esm';
 
-// >>> Hier die Anzahl der Fragen festlegen <<<
+// >>> Hier die Fragen festlegen (für ideen.html nur die erste Zeile behalten) <<<
 const FRAGEN = [
   { id: 'f1', titel: 'Frage 1' },
   { id: 'f2', titel: 'Frage 2' },
@@ -117,8 +115,7 @@ const board = location.hash.slice(1) || 'ideen';
 const bearbeitenModus = new URLSearchParams(location.search).has('bearbeiten');
 const $ = id => document.getElementById(id);
 
-// Jede Frage speichert ihre Ideen unter einem eigenen Namen.
-// Die erste Frage nutzt den Namen aus dem Link, damit bisherige Ideen erhalten bleiben.
+// Die erste Frage nutzt den Namen aus dem Link, damit bisherige Ideen erhalten bleiben
 const boardVon = f => f.id === FRAGEN[0].id ? board : board + '--' + f.id;
 const frageSchluessel = f => f.id === FRAGEN[0].id ? 'frage' : 'frage-' + f.id;
 const frageVonBoard = new Map(FRAGEN.map(f => [boardVon(f), f]));
@@ -127,6 +124,7 @@ const alleBoards = FRAGEN.map(boardVon);
 const ideen = new Map();
 const karten = new Map();
 const bereiche = new Map();
+const kommentarElemente = new Map();
 let filter = 'alle';
 let sortierung = 'neu';
 let pin = null;
@@ -167,6 +165,14 @@ function textMitLinks(el, text) {
   });
 }
 
+async function mitPin(aktion) {
+  if (!pin) pin = prompt('Bitte deinen PIN eingeben:');
+  if (!pin) return false;
+  const { error } = await aktion(pin);
+  if (error) { pin = null; zeigeFehler(error.message); return false; }
+  return true;
+}
+
 let person = lesen('ideen-person');
 if (!person) {
   person = Date.now().toString(36) + Math.random().toString(36).slice(2);
@@ -176,6 +182,55 @@ if (!person) {
 $('name-feld').value = lesen('ideen-name') || '';
 $('name-feld').addEventListener('input', () => schreiben('ideen-name', $('name-feld').value));
 const meinName = () => $('name-feld').value.trim() || null;
+
+// ---------- Eigene Beiträge wiedererkennen (Bearbeiten und Löschen) ----------
+function eigeneLesen() { try { return JSON.parse(localStorage.getItem('eigene-schluessel') || '{}'); } catch { return {}; } }
+const eigene = eigeneLesen();
+function eigeneSpeichern() { try { localStorage.setItem('eigene-schluessel', JSON.stringify(eigene)); } catch {} }
+
+async function neuerSchluessel() {
+  if (!(window.crypto && crypto.subtle)) return null;
+  const hex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  const schluessel = hex(crypto.getRandomValues(new Uint8Array(16)));
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(schluessel));
+  return { schluessel, hash: hex(new Uint8Array(hash)) };
+}
+
+function merkeEigenes(tabelle, id, k) {
+  if (!k) return;
+  eigene[tabelle + ':' + id] = { s: k.schluessel, b: board, t: Date.now() };
+  eigeneSpeichern();
+}
+
+const schluesselVon = (tabelle, id) => (eigene[tabelle + ':' + id] || {}).s || null;
+const darf = (tabelle, id) => bearbeitenModus || !!schluesselVon(tabelle, id);
+
+async function loeschen(tabelle, id) {
+  if (bearbeitenModus) {
+    return mitPin(p => supabase.rpc('mit_pin_loeschen', { p_tabelle: tabelle, p_id: id, p_pin: p }));
+  }
+  const s = schluesselVon(tabelle, id);
+  if (!s) return false;
+  const { data, error } = await supabase.rpc('eigenes_loeschen', { p_tabelle: tabelle, p_id: id, p_schluessel: s });
+  if (error) { zeigeFehler(error.message); return false; }
+  if (!data) { zeigeFehler('Das konnte nicht gelöscht werden.'); return false; }
+  delete eigene[tabelle + ':' + id];
+  eigeneSpeichern();
+  return true;
+}
+
+async function aendern(tabelle, id, text) {
+  if (bearbeitenModus) {
+    return mitPin(p => supabase.rpc('mit_pin_bearbeiten', { p_tabelle: tabelle, p_id: id, p_pin: p, p_text: text }));
+  }
+  const s = schluesselVon(tabelle, id);
+  if (!s) return false;
+  const { data, error } = await supabase.rpc('eigenes_bearbeiten',
+    { p_tabelle: tabelle, p_id: id, p_schluessel: s, p_text: text });
+  if (error) { zeigeFehler(error.message); return false; }
+  if (!data) { zeigeFehler('Das konnte nicht geändert werden.'); return false; }
+  return true;
+}
 
 // ---------- Filter und Sortierung ----------
 function baueLeisten() {
@@ -207,7 +262,14 @@ for (const f of FRAGEN) {
     feld = element('textarea');
     feld.placeholder = 'Text für ' + f.titel + ' …';
     const knopf = element('button', 'haupt', 'Frage speichern');
-    knopf.addEventListener('click', () => frageSpeichern(f, feld.value, knopf));
+    knopf.addEventListener('click', async () => {
+      const ok = await mitPin(p => supabase.rpc('fall_speichern',
+        { p_board: board, p_fall: frageSchluessel(f), p_text: feld.value, p_pin: p }));
+      if (ok) {
+        knopf.textContent = 'Gespeichert ✓';
+        setTimeout(() => { knopf.textContent = 'Frage speichern'; }, 2000);
+      }
+    });
     box.append(feld, knopf);
     bereich.append(box);
   }
@@ -223,11 +285,17 @@ for (const f of FRAGEN) {
   senden.addEventListener('click', async () => {
     const text = ideeFeld.value.trim();
     if (!text) return;
-    const { error } = await supabase.from('ideen').insert({
-      board: boardVon(f), text, name: meinName(), label: labelFeld.value || null,
-    });
-    if (error) zeigeFehler(error.message);
-    else ideeFeld.value = '';
+    senden.disabled = true;
+    const k = await neuerSchluessel();
+    const { data, error } = await supabase.from('ideen').insert({
+      board: boardVon(f), text, name: meinName(), label: labelFeld.value || null, loesch_hash: k ? k.hash : null,
+    }).select('id').single();
+    senden.disabled = false;
+    if (error) { zeigeFehler(error.message); return; }
+    ideeFeld.value = '';
+    merkeEigenes('ideen', data.id, k);
+    const vorhanden = ideen.get(data.id);
+    if (vorhanden) ideeKnoepfe(vorhanden);
   });
   const zeile = element('div', 'zeile');
   zeile.append(labelFeld, senden);
@@ -242,18 +310,18 @@ for (const f of FRAGEN) {
   $('fragen').append(bereich);
 }
 
-// ---------- Karten ----------
+// ---------- Ideen-Karten ----------
 function karteErstellen(idee) {
   const el = element('div', 'idee');
+  el.dataset.id = idee.id;
   const label = labelVon(idee.label);
   if (label) {
     el.style.setProperty('--farbe', label.farbe);
     el.append(element('span', 'label', label.name));
   }
-  const text = element('p', 'ideetext');
-  textMitLinks(text, idee.text);
-  el.append(text);
-  el.append(element('div', 'meta', (idee.name || 'Anonym') + ' · ' + zeit(idee.created_at)));
+  const textEl = element('p', 'ideetext');
+  const meta = element('div', 'meta');
+  el.append(textEl, meta);
 
   const likeKnopf = element('button', 'like');
   likeKnopf.addEventListener('click', () => likeUmschalten(idee));
@@ -273,24 +341,90 @@ function karteErstellen(idee) {
   form.append(input, element('button', '', 'Senden'));
   form.addEventListener('submit', async e => {
     e.preventDefault();
-    const { error } = await supabase.from('kommentare')
-      .insert({ idee_id: idee.id, board: idee.board, text: input.value.trim(), name: meinName() });
-    if (error) zeigeFehler(error.message);
-    else input.value = '';
+    const k = await neuerSchluessel();
+    const { data, error } = await supabase.from('kommentare')
+      .insert({ idee_id: idee.id, board: idee.board, text: input.value.trim(), name: meinName(), loesch_hash: k ? k.hash : null })
+      .select('id').single();
+    if (error) { zeigeFehler(error.message); return; }
+    input.value = '';
+    merkeEigenes('kommentare', data.id, k);
+    const vorhanden = kommentarElemente.get(data.id);
+    if (vorhanden) kommentarKnoepfe(vorhanden);
   });
   bereich.append(liste, form);
   el.append(bereich);
   kommentarKnopf.addEventListener('click', () => { bereich.hidden = !bereich.hidden; });
 
-  karten.set(idee.id, { el, likeKnopf, kommentarKnopf, liste });
+  karten.set(idee.id, { el, textEl, meta, aktionen, likeKnopf, kommentarKnopf, liste, knoepfe: false, form: null });
+  ideeAnzeigen(idee);
+  ideeKnoepfe(idee);
   aktualisiereKarte(idee);
+}
+
+function ideeAnzeigen(idee) {
+  const k = karten.get(idee.id);
+  k.textEl.replaceChildren();
+  textMitLinks(k.textEl, idee.text || '');
+  k.textEl.hidden = !!k.form;
+  k.meta.textContent = (idee.name || 'Anonym') + ' · ' + zeit(idee.created_at) + (idee.bearbeitet_am ? ' · bearbeitet' : '');
+}
+
+function ideeKnoepfe(idee) {
+  const k = karten.get(idee.id);
+  if (k.knoepfe || !darf('ideen', idee.id)) return;
+  const bearb = element('button', 'klein', '✏️');
+  bearb.title = 'Idee bearbeiten';
+  bearb.addEventListener('click', () => ideeBearbeiten(idee));
+  const entf = element('button', 'klein entf', '🗑');
+  entf.title = 'Idee löschen';
+  entf.addEventListener('click', async () => {
+    if (!confirm('Diese Idee mit allen Likes und Kommentaren löschen?')) return;
+    if (await loeschen('ideen', idee.id)) { ideeEntfernen(idee.id); zeichne(); }
+  });
+  k.aktionen.append(bearb, entf);
+  k.knoepfe = true;
+}
+
+function ideeBearbeiten(idee) {
+  const k = karten.get(idee.id);
+  if (k.form) return;
+  const form = element('form', 'bearbeiten-form');
+  const feld = element('textarea');
+  feld.maxLength = 1000;
+  feld.value = idee.text || '';
+  const speichern = element('button', 'haupt', 'Speichern');
+  const abbrechen = element('button', '', 'Abbrechen');
+  abbrechen.type = 'button';
+  const zeile = element('div', 'zeile');
+  zeile.append(speichern, abbrechen);
+  form.append(feld, zeile);
+  k.textEl.after(form);
+  k.form = form;
+  ideeAnzeigen(idee);
+
+  const schliessen = () => { form.remove(); k.form = null; ideeAnzeigen(idee); };
+  abbrechen.addEventListener('click', schliessen);
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const text = feld.value.trim();
+    if (!text) return;
+    speichern.disabled = true;
+    const ok = await aendern('ideen', idee.id, text);
+    speichern.disabled = false;
+    if (ok) {
+      idee.text = text;
+      idee.bearbeitet_am = new Date().toISOString();
+      schliessen();
+    }
+  });
+  feld.focus();
 }
 
 function aktualisiereKarte(idee) {
   const k = karten.get(idee.id);
   k.likeKnopf.textContent = '♥ ' + idee.likes.size;
   k.likeKnopf.classList.toggle('meins', idee.likes.has(person));
-  k.kommentarKnopf.textContent = '💬 ' + idee.kommentare.length;
+  k.kommentarKnopf.textContent = '💬 ' + idee.kommentare.size;
 }
 
 function zeichne() {
@@ -303,10 +437,7 @@ function zeichne() {
         return new Date(y.created_at) - new Date(x.created_at);
       });
     const ids = new Set(sichtbar.map(i => i.id));
-    for (const el of [...b.container.children]) {
-      const id = Number(el.dataset.id);
-      if (!ids.has(id)) el.remove();
-    }
+    for (const el of [...b.container.children]) if (!ids.has(Number(el.dataset.id))) el.remove();
     sichtbar.forEach((idee, i) => {
       const el = karten.get(idee.id).el;
       if (b.container.children[i] !== el) b.container.insertBefore(el, b.container.children[i] || null);
@@ -319,10 +450,17 @@ function zeichne() {
 function neueIdee(zeile) {
   const f = frageVonBoard.get(zeile.board);
   if (!f || ideen.has(zeile.id)) return;
-  const idee = { ...zeile, frage: f.id, likes: new Set(), kommentare: [] };
+  const idee = { ...zeile, frage: f.id, likes: new Set(), kommentare: new Set() };
   ideen.set(idee.id, idee);
   karteErstellen(idee);
-  karten.get(idee.id).el.dataset.id = idee.id;
+}
+
+function ideeAktualisieren(zeile) {
+  const idee = ideen.get(zeile.id);
+  if (!idee) return;
+  idee.text = zeile.text;
+  idee.bearbeitet_am = zeile.bearbeitet_am;
+  if (!karten.get(idee.id).form) ideeAnzeigen(idee);
 }
 
 function ideeEntfernen(id) {
@@ -332,15 +470,68 @@ function ideeEntfernen(id) {
   ideen.delete(id);
 }
 
+function kommentarZeigen(k) {
+  const d = k.daten;
+  k.wer.textContent = (d.name || 'Anonym') + ' · ' + zeit(d.created_at) + (d.bearbeitet_am ? ' · bearbeitet' : '');
+  k.textEl.replaceChildren();
+  textMitLinks(k.textEl, d.text || '');
+}
+
+function kommentarKnoepfe(k) {
+  const id = k.daten.id;
+  if (k.knoepfe || !darf('kommentare', id)) return;
+  const bearb = element('button', 'bearb', '✏️');
+  bearb.title = 'Kommentar bearbeiten';
+  bearb.addEventListener('click', async () => {
+    const neu = prompt('Kommentar bearbeiten:', k.daten.text);
+    if (neu === null || !neu.trim()) return;
+    const text = neu.trim().slice(0, 500);
+    if (await aendern('kommentare', id, text)) {
+      k.daten.text = text;
+      k.daten.bearbeitet_am = new Date().toISOString();
+      kommentarZeigen(k);
+    }
+  });
+  const entf = element('button', 'entf', '✕');
+  entf.title = 'Kommentar löschen';
+  entf.addEventListener('click', async () => {
+    if (!confirm('Diesen Kommentar wirklich löschen?')) return;
+    if (await loeschen('kommentare', id)) kommentarEntfernen(id);
+  });
+  k.el.append(bearb, entf);
+  k.knoepfe = true;
+}
+
 function neuerKommentar(zeile) {
   const idee = ideen.get(zeile.idee_id);
-  if (!idee || idee.kommentare.some(k => k.id === zeile.id)) return;
-  idee.kommentare.push(zeile);
+  if (!idee || idee.kommentare.has(zeile.id)) return;
+  idee.kommentare.add(zeile.id);
   const box = element('div', 'kommentar');
-  box.append(element('span', 'wer', (zeile.name || 'Anonym') + ' · ' + zeit(zeile.created_at)));
-  textMitLinks(box, zeile.text);
+  const wer = element('span', 'wer');
+  const textEl = element('span');
+  box.append(wer, textEl);
   karten.get(idee.id).liste.append(box);
+  const k = { daten: zeile, el: box, wer, textEl, idee, knoepfe: false };
+  kommentarElemente.set(zeile.id, k);
+  kommentarZeigen(k);
+  kommentarKnoepfe(k);
   aktualisiereKarte(idee);
+}
+
+function kommentarAktualisieren(zeile) {
+  const k = kommentarElemente.get(zeile.id);
+  if (!k) return;
+  k.daten = { ...k.daten, ...zeile };
+  kommentarZeigen(k);
+}
+
+function kommentarEntfernen(id) {
+  const k = kommentarElemente.get(id);
+  if (!k) return;
+  k.el.remove();
+  k.idee.kommentare.delete(id);
+  if (ideen.has(k.idee.id)) aktualisiereKarte(k.idee);
+  kommentarElemente.delete(id);
 }
 
 function likeSetzen(ideeId, wer, an) {
@@ -370,18 +561,6 @@ function zeigeFrage(zeile) {
   if (b.feld && document.activeElement !== b.feld) b.feld.value = zeile.beschreibung || '';
 }
 
-async function frageSpeichern(f, text, knopf) {
-  if (!pin) pin = prompt('Bitte deinen PIN eingeben:');
-  if (!pin) return;
-  const { error } = await supabase.rpc('fall_speichern',
-    { p_board: board, p_fall: frageSchluessel(f), p_text: text, p_pin: pin });
-  if (error) { pin = null; zeigeFehler(error.message); }
-  else {
-    knopf.textContent = 'Gespeichert ✓';
-    setTimeout(() => { knopf.textContent = 'Frage speichern'; }, 2000);
-  }
-}
-
 // ---------- Laden ----------
 baueLeisten();
 const [r1, r2, r3, r4] = await Promise.all([
@@ -403,6 +582,8 @@ const nurBoards = 'board=in.(' + alleBoards.join(',') + ')';
 supabase.channel('ideen-' + board)
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ideen', filter: nurBoards },
       p => { neueIdee(p.new); zeichne(); })
+  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'ideen', filter: nurBoards },
+      p => ideeAktualisieren(p.new))
   .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'ideen' },
       p => { ideeEntfernen(p.old.id); zeichne(); })
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'likes', filter: nurBoards },
@@ -411,6 +592,10 @@ supabase.channel('ideen-' + board)
       p => likeSetzen(p.old.idee_id, p.old.person, false))
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'kommentare', filter: nurBoards },
       p => neuerKommentar(p.new))
+  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'kommentare', filter: nurBoards },
+      p => kommentarAktualisieren(p.new))
+  .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'kommentare' },
+      p => kommentarEntfernen(p.old.id))
   .on('postgres_changes', { event: '*', schema: 'public', table: 'faelle', filter: 'board=eq.' + board },
       p => { if (p.new && p.new.fall) zeigeFrage(p.new); })
   .subscribe(status => {

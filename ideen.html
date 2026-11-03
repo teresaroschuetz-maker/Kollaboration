@@ -9,67 +9,81 @@
   main { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
   #status { font-size: .9rem; color: #666; margin-bottom: .8rem; }
   #fehler { background: #fbebeb; color: #a00; padding: .8rem; border-radius: 6px; margin-bottom: 1rem; }
-  #frage { font-size: 1.6rem; margin: 0 0 1.2rem; white-space: pre-wrap; }
-  #frage.leer { color: #999; font-weight: 400; font-style: italic; }
-  #frage-bearbeiten { margin-bottom: 1.2rem; }
+  .oben { background: #fff; border-radius: 10px; padding: 1rem; box-shadow: 0 2px 6px rgba(0,0,0,.1);
+          margin-bottom: 2rem; }
+  .oben input { padding: .45rem; font-size: 1rem; width: 100%; max-width: 22rem; box-sizing: border-box;
+                margin-bottom: .8rem; }
   textarea { width: 100%; box-sizing: border-box; min-height: 4rem; padding: .6rem; font: inherit; }
-  .neu { background: #fff; border-radius: 10px; padding: 1rem; box-shadow: 0 2px 6px rgba(0,0,0,.1);
-         margin-bottom: 1.2rem; display: grid; gap: .6rem; }
-  .zeile { display: flex; gap: .5rem; flex-wrap: wrap; }
-  .zeile input, .zeile select { padding: .45rem; font-size: 1rem; }
-  .zeile input { flex: 1; min-width: 10rem; }
   button { padding: .45rem .9rem; font-size: 1rem; cursor: pointer; border-radius: 6px;
            border: 1px solid #bbb; background: #fff; color: #222; }
   button.haupt { background: #2f6fb3; color: #fff; border-color: #2f6fb3; }
-  .leiste { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin-bottom: .8rem; }
+  .leiste { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin-bottom: .5rem; }
   .leiste .titel { color: #666; margin-right: .3rem; }
   .chip { border-radius: 999px; padding: .3rem .8rem; font-size: .9rem; }
   .chip.aktiv { background: #222; color: #fff; border-color: #222; }
-  #leer { color: #888; font-style: italic; }
-  #ideen { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; align-items: start; }
+  .frage-bereich { margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e3e0d8; }
+  .frage { font-size: 1.5rem; margin: 0 0 1rem; white-space: pre-wrap; }
+  .frage.leer { color: #999; font-weight: 400; font-style: italic; }
+  .bearbeiten { margin-bottom: 1rem; }
+  .neu { background: #fff; border-radius: 10px; padding: 1rem; box-shadow: 0 2px 6px rgba(0,0,0,.1);
+         margin-bottom: 1rem; display: grid; gap: .6rem; }
+  .zeile { display: flex; gap: .5rem; flex-wrap: wrap; }
+  .zeile select { padding: .45rem; font-size: 1rem; }
+  .keine { color: #888; font-style: italic; }
+  .ideen { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; align-items: start; }
   .idee { background: #fff; border-radius: 10px; padding: 1rem; box-shadow: 0 2px 6px rgba(0,0,0,.1);
           border-top: 5px solid var(--farbe, #ddd); }
   .label { display: inline-block; font-size: .8rem; font-weight: 600; color: #fff; background: var(--farbe);
            border-radius: 999px; padding: .15rem .6rem; margin-bottom: .5rem; }
   .ideetext { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 0 .7rem; }
-  .meta { font-size: .85rem; color: #777; margin-bottom: .6rem; }
-  .aktionen { display: flex; gap: .4rem; }
+  .ideetext[hidden] { display: none; }
+  .meta { font-size: .85rem; color: #666; margin-bottom: .6rem; }
+  .aktionen { display: flex; gap: .4rem; flex-wrap: wrap; }
+  .aktionen .klein { padding: .35rem .6rem; }
+  .aktionen .entf { color: #8a1c14; }
   .like.meins { background: #fde2e4; border-color: #e05a6b; }
+  .bearbeiten-form { display: grid; gap: .4rem; margin: 0 0 .7rem; }
+  .bearbeiten-form button { padding: .3rem .8rem; font-size: .9rem; }
   .kommentare { margin-top: .8rem; border-top: 1px solid #eee; padding-top: .6rem; }
-  .kommentar { font-size: .92rem; background: #f6f6f6; border-radius: 6px; padding: .45rem .6rem;
-               margin-bottom: .4rem; white-space: pre-wrap; overflow-wrap: anywhere; }
-  .kommentar .wer { display: block; font-size: .8rem; color: #777; }
+  .kommentar { position: relative; font-size: .92rem; background: #f6f6f6; border-radius: 6px;
+               padding: .45rem 3.4rem .45rem .6rem; margin-bottom: .4rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .kommentar .wer { display: block; font-size: .8rem; color: #666; }
+  .kommentar .bearb, .kommentar .entf { position: absolute; top: .2rem; padding: 0 .35rem; font-size: .85rem;
+                                       background: transparent; border: none; }
+  .kommentar .bearb { right: 1.7rem; }
+  .kommentar .entf { right: .25rem; color: #8a1c14; }
   .kommentare form { display: flex; gap: .4rem; }
   .kommentare input { flex: 1; min-width: 0; padding: .4rem; font-size: .95rem; }
+    /* >>> Farbdesign Ideensammlung: Lavendel <<< */
+  body { background: #f1edfb; color: #221a3d; }
+  #frage { color: #3d2a85; }
+  #frage.leer, #status, #leer, .meta, .leiste .titel, .kommentar .wer { color: #5c5478; }
+  button { border-color: #cfc5ee; border-radius: 999px; }
+  button.haupt, .chip.aktiv { background: #5b3fb5; border-color: #5b3fb5; color: #fff; }
+  .neu { border: 1px solid #ddd4f6; }
+  .like.meins { background: #fde2ec; border-color: #c2185b; }
+  .kommentar { background: #f6f3fd; }
 </style>
 </head>
 <body>
 <main>
   <div id="status">Verbinde …</div>
   <div id="fehler" hidden></div>
-  <h1 id="frage" class="leer">Noch keine Frage eingetragen.</h1>
-  <div id="frage-bearbeiten" hidden>
-    <textarea id="frage-feld" placeholder="Frage für das Brainstorming …"></textarea>
-    <button id="frage-speichern" class="haupt">Frage speichern</button>
+  <div class="oben">
+    <input id="name-feld" maxlength="60" placeholder="Dein Name (optional)">
+    <div class="leiste" id="filter"></div>
+    <div class="leiste" id="sortierung"></div>
   </div>
-
-  <div class="neu">
-    <textarea id="idee-feld" maxlength="1000" placeholder="Deine Idee …"></textarea>
-    <div class="zeile">
-      <input id="name-feld" maxlength="60" placeholder="Dein Name (optional)">
-      <select id="label-feld"></select>
-      <button id="idee-senden" class="haupt">Idee hinzufügen</button>
-    </div>
-  </div>
-
-  <div class="leiste" id="filter"></div>
-  <div class="leiste" id="sortierung"></div>
-  <p id="leer" hidden>Noch keine Ideen.</p>
-  <div id="ideen"></div>
+  <div id="fragen"></div>
 </main>
 
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1/+esm';
+
+// >>> Hier die Fragen festlegen (für ideen.html nur die erste Zeile behalten) <<<
+const FRAGEN = [
+  { id: 'f1', titel: 'Frage' },
+];
 
 // >>> Hier deine Labels anpassen <<<
 const LABELS = [
@@ -85,8 +99,17 @@ const supabase = createClient('https://oeqlvlrnflqfevktfyuz.supabase.co', 'sb_pu
 const board = location.hash.slice(1) || 'ideen';
 const bearbeitenModus = new URLSearchParams(location.search).has('bearbeiten');
 const $ = id => document.getElementById(id);
-const ideen = new Map();    // alle Ideen nach id
-const karten = new Map();   // die Karte zu jeder Idee
+
+// Die erste Frage nutzt den Namen aus dem Link, damit bisherige Ideen erhalten bleiben
+const boardVon = f => f.id === FRAGEN[0].id ? board : board + '--' + f.id;
+const frageSchluessel = f => f.id === FRAGEN[0].id ? 'frage' : 'frage-' + f.id;
+const frageVonBoard = new Map(FRAGEN.map(f => [boardVon(f), f]));
+const alleBoards = FRAGEN.map(boardVon);
+
+const ideen = new Map();
+const karten = new Map();
+const bereiche = new Map();
+const kommentarElemente = new Map();
 let filter = 'alle';
 let sortierung = 'neu';
 let pin = null;
@@ -113,7 +136,6 @@ function zeit(datum) {
   return new Date(datum).toLocaleString('de-AT', { dateStyle: 'short', timeStyle: 'short' });
 }
 
-// Text einfügen und Internet-Adressen anklickbar machen
 function textMitLinks(el, text) {
   text.split(/(https?:\/\/[^\s]+)/g).forEach((teil, i) => {
     if (i % 2 === 1) {
@@ -128,21 +150,74 @@ function textMitLinks(el, text) {
   });
 }
 
-// Jedes Gerät bekommt eine zufällige Kennung, damit jede Person nur einmal liken kann
+async function mitPin(aktion) {
+  if (!pin) pin = prompt('Bitte deinen PIN eingeben:');
+  if (!pin) return false;
+  const { error } = await aktion(pin);
+  if (error) { pin = null; zeigeFehler(error.message); return false; }
+  return true;
+}
+
 let person = lesen('ideen-person');
 if (!person) {
   person = Date.now().toString(36) + Math.random().toString(36).slice(2);
   schreiben('ideen-person', person);
 }
 
-// Name merken
 $('name-feld').value = lesen('ideen-name') || '';
 $('name-feld').addEventListener('input', () => schreiben('ideen-name', $('name-feld').value));
+const meinName = () => $('name-feld').value.trim() || null;
 
-// ---------- Label-Auswahl, Filter und Sortierung ----------
-$('label-feld').append(new Option('Ohne Label', ''));
-for (const l of LABELS) $('label-feld').append(new Option(l.name, l.id));
+// ---------- Eigene Beiträge wiedererkennen (Bearbeiten und Löschen) ----------
+function eigeneLesen() { try { return JSON.parse(localStorage.getItem('eigene-schluessel') || '{}'); } catch { return {}; } }
+const eigene = eigeneLesen();
+function eigeneSpeichern() { try { localStorage.setItem('eigene-schluessel', JSON.stringify(eigene)); } catch {} }
 
+async function neuerSchluessel() {
+  if (!(window.crypto && crypto.subtle)) return null;
+  const hex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  const schluessel = hex(crypto.getRandomValues(new Uint8Array(16)));
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(schluessel));
+  return { schluessel, hash: hex(new Uint8Array(hash)) };
+}
+
+function merkeEigenes(tabelle, id, k) {
+  if (!k) return;
+  eigene[tabelle + ':' + id] = { s: k.schluessel, b: board, t: Date.now() };
+  eigeneSpeichern();
+}
+
+const schluesselVon = (tabelle, id) => (eigene[tabelle + ':' + id] || {}).s || null;
+const darf = (tabelle, id) => bearbeitenModus || !!schluesselVon(tabelle, id);
+
+async function loeschen(tabelle, id) {
+  if (bearbeitenModus) {
+    return mitPin(p => supabase.rpc('mit_pin_loeschen', { p_tabelle: tabelle, p_id: id, p_pin: p }));
+  }
+  const s = schluesselVon(tabelle, id);
+  if (!s) return false;
+  const { data, error } = await supabase.rpc('eigenes_loeschen', { p_tabelle: tabelle, p_id: id, p_schluessel: s });
+  if (error) { zeigeFehler(error.message); return false; }
+  if (!data) { zeigeFehler('Das konnte nicht gelöscht werden.'); return false; }
+  delete eigene[tabelle + ':' + id];
+  eigeneSpeichern();
+  return true;
+}
+
+async function aendern(tabelle, id, text) {
+  if (bearbeitenModus) {
+    return mitPin(p => supabase.rpc('mit_pin_bearbeiten', { p_tabelle: tabelle, p_id: id, p_pin: p, p_text: text }));
+  }
+  const s = schluesselVon(tabelle, id);
+  if (!s) return false;
+  const { data, error } = await supabase.rpc('eigenes_bearbeiten',
+    { p_tabelle: tabelle, p_id: id, p_schluessel: s, p_text: text });
+  if (error) { zeigeFehler(error.message); return false; }
+  if (!data) { zeigeFehler('Das konnte nicht geändert werden.'); return false; }
+  return true;
+}
+
+// ---------- Filter und Sortierung ----------
 function baueLeisten() {
   const f = $('filter');
   f.replaceChildren(element('span', 'titel', 'Filter:'));
@@ -160,19 +235,78 @@ function baueLeisten() {
   }
 }
 
-// ---------- Karten ----------
+// ---------- Fragenbereiche aufbauen ----------
+for (const f of FRAGEN) {
+  const bereich = element('section', 'frage-bereich');
+  const frageEl = element('h2', 'frage leer', f.titel + ' – noch nicht eingetragen');
+  bereich.append(frageEl);
+
+  let feld = null;
+  if (bearbeitenModus) {
+    const box = element('div', 'bearbeiten');
+    feld = element('textarea');
+    feld.placeholder = 'Text für ' + f.titel + ' …';
+    const knopf = element('button', 'haupt', 'Frage speichern');
+    knopf.addEventListener('click', async () => {
+      const ok = await mitPin(p => supabase.rpc('fall_speichern',
+        { p_board: board, p_fall: frageSchluessel(f), p_text: feld.value, p_pin: p }));
+      if (ok) {
+        knopf.textContent = 'Gespeichert ✓';
+        setTimeout(() => { knopf.textContent = 'Frage speichern'; }, 2000);
+      }
+    });
+    box.append(feld, knopf);
+    bereich.append(box);
+  }
+
+  const neu = element('div', 'neu');
+  const ideeFeld = element('textarea');
+  ideeFeld.maxLength = 1000;
+  ideeFeld.placeholder = 'Deine Idee zu dieser Frage …';
+  const labelFeld = element('select');
+  labelFeld.append(new Option('Ohne Label', ''));
+  for (const l of LABELS) labelFeld.append(new Option(l.name, l.id));
+  const senden = element('button', 'haupt', 'Idee hinzufügen');
+  senden.addEventListener('click', async () => {
+    const text = ideeFeld.value.trim();
+    if (!text) return;
+    senden.disabled = true;
+    const k = await neuerSchluessel();
+    const { data, error } = await supabase.from('ideen').insert({
+      board: boardVon(f), text, name: meinName(), label: labelFeld.value || null, loesch_hash: k ? k.hash : null,
+    }).select('id').single();
+    senden.disabled = false;
+    if (error) { zeigeFehler(error.message); return; }
+    ideeFeld.value = '';
+    merkeEigenes('ideen', data.id, k);
+    const vorhanden = ideen.get(data.id);
+    if (vorhanden) ideeKnoepfe(vorhanden);
+  });
+  const zeile = element('div', 'zeile');
+  zeile.append(labelFeld, senden);
+  neu.append(ideeFeld, zeile);
+  bereich.append(neu);
+
+  const keine = element('p', 'keine', 'Noch keine Ideen.');
+  const container = element('div', 'ideen');
+  bereich.append(keine, container);
+
+  bereiche.set(f.id, { frageEl, feld, keine, container });
+  $('fragen').append(bereich);
+}
+
+// ---------- Ideen-Karten ----------
 function karteErstellen(idee) {
   const el = element('div', 'idee');
+  el.dataset.id = idee.id;
   const label = labelVon(idee.label);
   if (label) {
     el.style.setProperty('--farbe', label.farbe);
     el.append(element('span', 'label', label.name));
   }
-
-  const text = element('p', 'ideetext');
-  textMitLinks(text, idee.text);
-  el.append(text);
-  el.append(element('div', 'meta', (idee.name || 'Anonym') + ' · ' + zeit(idee.created_at)));
+  const textEl = element('p', 'ideetext');
+  const meta = element('div', 'meta');
+  el.append(textEl, meta);
 
   const likeKnopf = element('button', 'like');
   likeKnopf.addEventListener('click', () => likeUmschalten(idee));
@@ -192,51 +326,126 @@ function karteErstellen(idee) {
   form.append(input, element('button', '', 'Senden'));
   form.addEventListener('submit', async e => {
     e.preventDefault();
-    const name = $('name-feld').value.trim() || null;
-    const { error } = await supabase.from('kommentare')
-      .insert({ idee_id: idee.id, board, text: input.value.trim(), name });
-    if (error) zeigeFehler(error.message);
-    else input.value = '';
+    const k = await neuerSchluessel();
+    const { data, error } = await supabase.from('kommentare')
+      .insert({ idee_id: idee.id, board: idee.board, text: input.value.trim(), name: meinName(), loesch_hash: k ? k.hash : null })
+      .select('id').single();
+    if (error) { zeigeFehler(error.message); return; }
+    input.value = '';
+    merkeEigenes('kommentare', data.id, k);
+    const vorhanden = kommentarElemente.get(data.id);
+    if (vorhanden) kommentarKnoepfe(vorhanden);
   });
   bereich.append(liste, form);
   el.append(bereich);
   kommentarKnopf.addEventListener('click', () => { bereich.hidden = !bereich.hidden; });
 
-  karten.set(idee.id, { el, likeKnopf, kommentarKnopf, liste });
+  karten.set(idee.id, { el, textEl, meta, aktionen, likeKnopf, kommentarKnopf, liste, knoepfe: false, form: null });
+  ideeAnzeigen(idee);
+  ideeKnoepfe(idee);
   aktualisiereKarte(idee);
+}
+
+function ideeAnzeigen(idee) {
+  const k = karten.get(idee.id);
+  k.textEl.replaceChildren();
+  textMitLinks(k.textEl, idee.text || '');
+  k.textEl.hidden = !!k.form;
+  k.meta.textContent = (idee.name || 'Anonym') + ' · ' + zeit(idee.created_at) + (idee.bearbeitet_am ? ' · bearbeitet' : '');
+}
+
+function ideeKnoepfe(idee) {
+  const k = karten.get(idee.id);
+  if (k.knoepfe || !darf('ideen', idee.id)) return;
+  const bearb = element('button', 'klein', '✏️');
+  bearb.title = 'Idee bearbeiten';
+  bearb.addEventListener('click', () => ideeBearbeiten(idee));
+  const entf = element('button', 'klein entf', '🗑');
+  entf.title = 'Idee löschen';
+  entf.addEventListener('click', async () => {
+    if (!confirm('Diese Idee mit allen Likes und Kommentaren löschen?')) return;
+    if (await loeschen('ideen', idee.id)) { ideeEntfernen(idee.id); zeichne(); }
+  });
+  k.aktionen.append(bearb, entf);
+  k.knoepfe = true;
+}
+
+function ideeBearbeiten(idee) {
+  const k = karten.get(idee.id);
+  if (k.form) return;
+  const form = element('form', 'bearbeiten-form');
+  const feld = element('textarea');
+  feld.maxLength = 1000;
+  feld.value = idee.text || '';
+  const speichern = element('button', 'haupt', 'Speichern');
+  const abbrechen = element('button', '', 'Abbrechen');
+  abbrechen.type = 'button';
+  const zeile = element('div', 'zeile');
+  zeile.append(speichern, abbrechen);
+  form.append(feld, zeile);
+  k.textEl.after(form);
+  k.form = form;
+  ideeAnzeigen(idee);
+
+  const schliessen = () => { form.remove(); k.form = null; ideeAnzeigen(idee); };
+  abbrechen.addEventListener('click', schliessen);
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const text = feld.value.trim();
+    if (!text) return;
+    speichern.disabled = true;
+    const ok = await aendern('ideen', idee.id, text);
+    speichern.disabled = false;
+    if (ok) {
+      idee.text = text;
+      idee.bearbeitet_am = new Date().toISOString();
+      schliessen();
+    }
+  });
+  feld.focus();
 }
 
 function aktualisiereKarte(idee) {
   const k = karten.get(idee.id);
   k.likeKnopf.textContent = '♥ ' + idee.likes.size;
   k.likeKnopf.classList.toggle('meins', idee.likes.has(person));
-  k.kommentarKnopf.textContent = '💬 ' + idee.kommentare.length;
+  k.kommentarKnopf.textContent = '💬 ' + idee.kommentare.size;
 }
 
-// Ideen gefiltert und sortiert anzeigen
 function zeichne() {
-  const sichtbar = [...ideen.values()]
-    .filter(i => filter === 'alle' || i.label === filter)
-    .sort((a, b) => {
-      if (sortierung === 'likes' && b.likes.size !== a.likes.size) return b.likes.size - a.likes.size;
-      return new Date(b.created_at) - new Date(a.created_at);
+  for (const f of FRAGEN) {
+    const b = bereiche.get(f.id);
+    const sichtbar = [...ideen.values()]
+      .filter(i => i.frage === f.id && (filter === 'alle' || i.label === filter))
+      .sort((x, y) => {
+        if (sortierung === 'likes' && y.likes.size !== x.likes.size) return y.likes.size - x.likes.size;
+        return new Date(y.created_at) - new Date(x.created_at);
+      });
+    const ids = new Set(sichtbar.map(i => i.id));
+    for (const el of [...b.container.children]) if (!ids.has(Number(el.dataset.id))) el.remove();
+    sichtbar.forEach((idee, i) => {
+      const el = karten.get(idee.id).el;
+      if (b.container.children[i] !== el) b.container.insertBefore(el, b.container.children[i] || null);
     });
-  const container = $('ideen');
-  const ids = new Set(sichtbar.map(i => i.id));
-  for (const [id, k] of karten) if (!ids.has(id)) k.el.remove();
-  sichtbar.forEach((idee, i) => {
-    const el = karten.get(idee.id).el;
-    if (container.children[i] !== el) container.insertBefore(el, container.children[i] || null);
-  });
-  $('leer').hidden = sichtbar.length > 0;
+    b.keine.hidden = sichtbar.length > 0;
+  }
 }
 
 // ---------- Daten verarbeiten ----------
 function neueIdee(zeile) {
-  if (ideen.has(zeile.id)) return;
-  const idee = { ...zeile, likes: new Set(), kommentare: [] };
+  const f = frageVonBoard.get(zeile.board);
+  if (!f || ideen.has(zeile.id)) return;
+  const idee = { ...zeile, frage: f.id, likes: new Set(), kommentare: new Set() };
   ideen.set(idee.id, idee);
   karteErstellen(idee);
+}
+
+function ideeAktualisieren(zeile) {
+  const idee = ideen.get(zeile.id);
+  if (!idee) return;
+  idee.text = zeile.text;
+  idee.bearbeitet_am = zeile.bearbeitet_am;
+  if (!karten.get(idee.id).form) ideeAnzeigen(idee);
 }
 
 function ideeEntfernen(id) {
@@ -246,15 +455,68 @@ function ideeEntfernen(id) {
   ideen.delete(id);
 }
 
+function kommentarZeigen(k) {
+  const d = k.daten;
+  k.wer.textContent = (d.name || 'Anonym') + ' · ' + zeit(d.created_at) + (d.bearbeitet_am ? ' · bearbeitet' : '');
+  k.textEl.replaceChildren();
+  textMitLinks(k.textEl, d.text || '');
+}
+
+function kommentarKnoepfe(k) {
+  const id = k.daten.id;
+  if (k.knoepfe || !darf('kommentare', id)) return;
+  const bearb = element('button', 'bearb', '✏️');
+  bearb.title = 'Kommentar bearbeiten';
+  bearb.addEventListener('click', async () => {
+    const neu = prompt('Kommentar bearbeiten:', k.daten.text);
+    if (neu === null || !neu.trim()) return;
+    const text = neu.trim().slice(0, 500);
+    if (await aendern('kommentare', id, text)) {
+      k.daten.text = text;
+      k.daten.bearbeitet_am = new Date().toISOString();
+      kommentarZeigen(k);
+    }
+  });
+  const entf = element('button', 'entf', '✕');
+  entf.title = 'Kommentar löschen';
+  entf.addEventListener('click', async () => {
+    if (!confirm('Diesen Kommentar wirklich löschen?')) return;
+    if (await loeschen('kommentare', id)) kommentarEntfernen(id);
+  });
+  k.el.append(bearb, entf);
+  k.knoepfe = true;
+}
+
 function neuerKommentar(zeile) {
   const idee = ideen.get(zeile.idee_id);
-  if (!idee || idee.kommentare.some(k => k.id === zeile.id)) return;
-  idee.kommentare.push(zeile);
+  if (!idee || idee.kommentare.has(zeile.id)) return;
+  idee.kommentare.add(zeile.id);
   const box = element('div', 'kommentar');
-  box.append(element('span', 'wer', (zeile.name || 'Anonym') + ' · ' + zeit(zeile.created_at)));
-  textMitLinks(box, zeile.text);
+  const wer = element('span', 'wer');
+  const textEl = element('span');
+  box.append(wer, textEl);
   karten.get(idee.id).liste.append(box);
+  const k = { daten: zeile, el: box, wer, textEl, idee, knoepfe: false };
+  kommentarElemente.set(zeile.id, k);
+  kommentarZeigen(k);
+  kommentarKnoepfe(k);
   aktualisiereKarte(idee);
+}
+
+function kommentarAktualisieren(zeile) {
+  const k = kommentarElemente.get(zeile.id);
+  if (!k) return;
+  k.daten = { ...k.daten, ...zeile };
+  kommentarZeigen(k);
+}
+
+function kommentarEntfernen(id) {
+  const k = kommentarElemente.get(id);
+  if (!k) return;
+  k.el.remove();
+  k.idee.kommentare.delete(id);
+  if (ideen.has(k.idee.id)) aktualisiereKarte(k.idee);
+  kommentarElemente.delete(id);
 }
 
 function likeSetzen(ideeId, wer, an) {
@@ -270,77 +532,57 @@ async function likeUmschalten(idee) {
   likeSetzen(idee.id, person, !hatteLike);
   const { error } = hatteLike
     ? await supabase.from('likes').delete().eq('idee_id', idee.id).eq('person', person)
-    : await supabase.from('likes').insert({ idee_id: idee.id, person, board });
+    : await supabase.from('likes').insert({ idee_id: idee.id, person, board: idee.board });
   if (error) { likeSetzen(idee.id, person, hatteLike); zeigeFehler(error.message); }
 }
 
-function zeigeFrage(text) {
-  const t = (text || '').trim();
-  $('frage').textContent = t || 'Noch keine Frage eingetragen.';
-  $('frage').classList.toggle('leer', !t);
-  if (bearbeitenModus && document.activeElement !== $('frage-feld')) $('frage-feld').value = text || '';
-}
-
-// ---------- Neue Idee senden ----------
-$('idee-senden').addEventListener('click', async () => {
-  const text = $('idee-feld').value.trim();
-  if (!text) return;
-  const { error } = await supabase.from('ideen').insert({
-    board, text,
-    name: $('name-feld').value.trim() || null,
-    label: $('label-feld').value || null,
-  });
-  if (error) zeigeFehler(error.message);
-  else $('idee-feld').value = '';
-});
-
-// ---------- Bearbeiten-Modus: Frage festlegen ----------
-if (bearbeitenModus) {
-  $('frage-bearbeiten').hidden = false;
-  $('frage-speichern').addEventListener('click', async () => {
-    if (!pin) pin = prompt('Bitte deinen PIN eingeben:');
-    if (!pin) return;
-    const { error } = await supabase.rpc('fall_speichern',
-      { p_board: board, p_fall: 'frage', p_text: $('frage-feld').value, p_pin: pin });
-    if (error) { pin = null; zeigeFehler(error.message); }
-    else {
-      $('frage-speichern').textContent = 'Gespeichert ✓';
-      setTimeout(() => { $('frage-speichern').textContent = 'Frage speichern'; }, 2000);
-    }
-  });
+function zeigeFrage(zeile) {
+  const f = FRAGEN.find(f => frageSchluessel(f) === zeile.fall);
+  if (!f) return;
+  const b = bereiche.get(f.id);
+  const t = (zeile.beschreibung || '').trim();
+  b.frageEl.textContent = t || f.titel + ' – noch nicht eingetragen';
+  b.frageEl.classList.toggle('leer', !t);
+  if (b.feld && document.activeElement !== b.feld) b.feld.value = zeile.beschreibung || '';
 }
 
 // ---------- Laden ----------
 baueLeisten();
 const [r1, r2, r3, r4] = await Promise.all([
-  supabase.from('ideen').select('*').eq('board', board).order('created_at'),
-  supabase.from('likes').select('idee_id, person').eq('board', board),
-  supabase.from('kommentare').select('*').eq('board', board).order('created_at'),
-  supabase.from('faelle').select('*').eq('board', board).eq('fall', 'frage'),
+  supabase.from('ideen').select('*').in('board', alleBoards).order('created_at'),
+  supabase.from('likes').select('idee_id, person').in('board', alleBoards),
+  supabase.from('kommentare').select('*').in('board', alleBoards).order('created_at'),
+  supabase.from('faelle').select('*').eq('board', board),
 ]);
 for (const r of [r1, r2, r3, r4]) if (r.error) zeigeFehler(r.error.message);
 (r1.data || []).forEach(neueIdee);
 (r2.data || []).forEach(l => { const i = ideen.get(l.idee_id); if (i) i.likes.add(l.person); });
 (r3.data || []).forEach(neuerKommentar);
 ideen.forEach(aktualisiereKarte);
-if (r4.data && r4.data[0]) zeigeFrage(r4.data[0].beschreibung);
+(r4.data || []).forEach(zeigeFrage);
 zeichne();
 
 // ---------- Live-Aktualisierung ----------
-const nurBoard = 'board=eq.' + board;
+const nurBoards = 'board=in.(' + alleBoards.join(',') + ')';
 supabase.channel('ideen-' + board)
-  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ideen', filter: nurBoard },
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ideen', filter: nurBoards },
       p => { neueIdee(p.new); zeichne(); })
+  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'ideen', filter: nurBoards },
+      p => ideeAktualisieren(p.new))
   .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'ideen' },
       p => { ideeEntfernen(p.old.id); zeichne(); })
-  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'likes', filter: nurBoard },
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'likes', filter: nurBoards },
       p => likeSetzen(p.new.idee_id, p.new.person, true))
   .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'likes' },
       p => likeSetzen(p.old.idee_id, p.old.person, false))
-  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'kommentare', filter: nurBoard },
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'kommentare', filter: nurBoards },
       p => neuerKommentar(p.new))
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'faelle', filter: nurBoard },
-      p => { if (p.new && p.new.fall === 'frage') zeigeFrage(p.new.beschreibung); })
+  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'kommentare', filter: nurBoards },
+      p => kommentarAktualisieren(p.new))
+  .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'kommentare' },
+      p => kommentarEntfernen(p.old.id))
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'faelle', filter: 'board=eq.' + board },
+      p => { if (p.new && p.new.fall) zeigeFrage(p.new); })
   .subscribe(status => {
     if (status === 'SUBSCRIBED') $('status').textContent = bearbeitenModus
       ? '● Live verbunden – Bearbeiten-Modus' : '● Live verbunden';
