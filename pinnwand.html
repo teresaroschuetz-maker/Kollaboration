@@ -45,17 +45,27 @@
   #wand { columns: 280px; column-gap: 1rem; }
   .beitrag { break-inside: avoid; display: inline-block; width: 100%; box-sizing: border-box; margin-bottom: 1rem;
              padding: .9rem; border-radius: 10px; box-shadow: 0 3px 8px rgba(80,60,0,.15); color: var(--text); }
+  .beitrag [hidden] { display: none !important; }
   .beitrag img.bild { display: block; width: 100%; border-radius: 6px; margin-bottom: .6rem; cursor: zoom-in; background: #fff; }
   .beitrag .text { margin: 0 0 .5rem; white-space: pre-wrap; overflow-wrap: anywhere; }
   .beitrag a { color: #1d4f8a; overflow-wrap: anywhere; }
   .anlage { display: block; background: rgba(255,255,255,.75); border-radius: 6px; padding: .4rem .6rem;
             margin-bottom: .5rem; text-decoration: none; font-weight: 600; }
   .meta { font-size: .82rem; color: #4d4430; margin-bottom: .4rem; }
-  .kommentar-knopf { padding: .25rem .7rem; font-size: .88rem; background: rgba(255,255,255,.8); }
+  .aktionen { display: flex; gap: .35rem; flex-wrap: wrap; align-items: center; }
+  .kommentar-knopf, .loeschen-knopf { padding: .25rem .7rem; font-size: .88rem; background: rgba(255,255,255,.8); }
+  .loeschen-knopf { color: #8a1c14; border-color: rgba(138,28,20,.35); }
+  .bearbeiten-form { display: grid; gap: .4rem; margin-bottom: .5rem; }
+  .bearbeiten-form input { width: 100%; }
+  .bearbeiten-form button { padding: .3rem .8rem; font-size: .9rem; }
   .kommentare { margin-top: .6rem; border-top: 1px solid rgba(0,0,0,.12); padding-top: .5rem; }
-  .kommentar { font-size: .9rem; background: rgba(255,255,255,.8); border-radius: 6px; padding: .4rem .55rem;
-               margin-bottom: .35rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .kommentar { position: relative; font-size: .9rem; background: rgba(255,255,255,.8); border-radius: 6px;
+               padding: .4rem 3.6rem .4rem .55rem; margin-bottom: .35rem; white-space: pre-wrap; overflow-wrap: anywhere; }
   .kommentar .wer { display: block; font-size: .78rem; color: #4d4430; }
+  .kommentar .weg, .kommentar .bearb { position: absolute; top: .2rem; padding: 0 .4rem; font-size: .85rem;
+                                       background: transparent; border: none; color: #8a1c14; }
+  .kommentar .weg { right: .25rem; }
+  .kommentar .bearb { right: 1.8rem; color: var(--text); }
   .kommentare form { display: flex; gap: .35rem; }
   .kommentare input { flex: 1; min-width: 0; padding: .35rem .5rem; font-size: .92rem; }
   .kommentare form button { padding: .3rem .7rem; font-size: .9rem; }
@@ -91,7 +101,7 @@
              accept="image/*,.pdf,.txt,.doc,.docx,.ppt,.pptx,.xls,.xlsx">
       <button id="senden" class="haupt">Anheften</button>
     </div>
-    <p class="hinweis">Erlaubt: Bilder, PDF, Word, PowerPoint, Excel und Text, höchstens 10 MB.</p>
+    <p class="hinweis">Erlaubt: Bilder, PDF, Word, PowerPoint, Excel und Text, höchstens 10 MB. Eigene Beiträge kannst du auf diesem Gerät bearbeiten und löschen.</p>
   </div>
 
   <p id="leer">Noch keine Beiträge.</p>
@@ -103,9 +113,9 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1/+esm';
 
 // >>> Einstellungen <<<
-const ZETTELFARBEN = ['#fff59d', '#c8f0c8', '#c9e4ff', '#ffd6e0', '#ffe0b2', '#e1d5ff'];
-const MAX_MB = 10;           // größte Datei in MB (höchstens so viel wie im SQL erlaubt)
-const BILD_PIXEL = 1600;     // Bilder werden auf diese Größe verkleinert
+const ZETTELFARBEN = ['#fff59d', '#c8f0c8', '#c9e4ff', '#ffb3b0', '#ffe0b2', '#e1d5ff', '#f9c6f0', '#e6e6e6'];
+const MAX_MB = 10;
+const BILD_PIXEL = 1600;
 
 // >>> Hier deine beiden Werte aus Teil 3 eintragen <<<
 const supabase = createClient('https://oeqlvlrnflqfevktfyuz.supabase.co', 'sb_publishable_x7jDXG-iMW23TDVUm9HSEA_bDANHESG');
@@ -113,7 +123,8 @@ const supabase = createClient('https://oeqlvlrnflqfevktfyuz.supabase.co', 'sb_pu
 const board = location.hash.slice(1) || 'start';
 const bearbeitenModus = new URLSearchParams(location.search).has('bearbeiten');
 const $ = id => document.getElementById(id);
-const beitraege = new Map();   // Schlüssel -> { daten, el, liste, knopf, kommentare }
+const beitraege = new Map();          // Schlüssel -> Beitrag mit seinen Elementen
+const kommentarElemente = new Map();  // Kommentar-Nummer -> Kommentar mit seinen Elementen
 let anhang = null;
 let pin = null;
 
@@ -153,6 +164,14 @@ function textMitLinks(el, text) {
 
 function istBild(typ) { return typeof typ === 'string' && typ.startsWith('image/'); }
 
+async function mitPin(aktion) {
+  if (!pin) pin = prompt('Bitte deinen PIN eingeben:');
+  if (!pin) return false;
+  const { error } = await aktion(pin);
+  if (error) { pin = null; zeigeFehler(error.message); return false; }
+  return true;
+}
+
 $('name-feld').value = lesen('ideen-name') || '';
 $('name-feld').addEventListener('input', () => schreiben('ideen-name', $('name-feld').value));
 const meinName = () => $('name-feld').value.trim() || null;
@@ -161,6 +180,55 @@ $('gross').addEventListener('click', () => { $('gross').hidden = true; });
 function zeigeGross(src) {
   $('gross').querySelector('img').src = src;
   $('gross').hidden = false;
+}
+
+// ---------- Eigene Beiträge wiedererkennen ----------
+function eigeneLesen() { try { return JSON.parse(localStorage.getItem('eigene-schluessel') || '{}'); } catch { return {}; } }
+const eigene = eigeneLesen();
+function eigeneSpeichern() { try { localStorage.setItem('eigene-schluessel', JSON.stringify(eigene)); } catch {} }
+
+async function neuerSchluessel() {
+  if (!(window.crypto && crypto.subtle)) return null;
+  const hex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  const schluessel = hex(crypto.getRandomValues(new Uint8Array(16)));
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(schluessel));
+  return { schluessel, hash: hex(new Uint8Array(hash)) };
+}
+
+function merkeEigenes(tabelle, id, k) {
+  if (!k) return;
+  eigene[tabelle + ':' + id] = { s: k.schluessel, b: board, t: Date.now() };
+  eigeneSpeichern();
+}
+
+const schluesselVon = (tabelle, id) => (eigene[tabelle + ':' + id] || {}).s || null;
+
+async function loeschen(tabelle, id) {
+  if (bearbeitenModus) {
+    return mitPin(p => supabase.rpc('mit_pin_loeschen', { p_tabelle: tabelle, p_id: id, p_pin: p }));
+  }
+  const s = schluesselVon(tabelle, id);
+  if (!s) return false;
+  const { data, error } = await supabase.rpc('eigenes_loeschen', { p_tabelle: tabelle, p_id: id, p_schluessel: s });
+  if (error) { zeigeFehler(error.message); return false; }
+  if (!data) { zeigeFehler('Das konnte nicht gelöscht werden.'); return false; }
+  delete eigene[tabelle + ':' + id];
+  eigeneSpeichern();
+  return true;
+}
+
+async function aendern(tabelle, id, text, link = null) {
+  if (bearbeitenModus) {
+    return mitPin(p => supabase.rpc('mit_pin_bearbeiten',
+      { p_tabelle: tabelle, p_id: id, p_pin: p, p_text: text, p_link: link }));
+  }
+  const s = schluesselVon(tabelle, id);
+  if (!s) return false;
+  const { data, error } = await supabase.rpc('eigenes_bearbeiten',
+    { p_tabelle: tabelle, p_id: id, p_schluessel: s, p_text: text, p_link: link });
+  if (error) { zeigeFehler(error.message); return false; }
+  if (!data) { zeigeFehler('Das konnte nicht geändert werden.'); return false; }
+  return true;
 }
 
 // ---------- Anhang wählen ----------
@@ -252,9 +320,14 @@ $('senden').addEventListener('click', async () => {
   knopf.textContent = anhang ? 'Wird hochgeladen …' : 'Wird angeheftet …';
   try {
     const datei = anhang ? await hochladen(anhang) : {};
-    const { error } = await supabase.from('ideen')
-      .insert({ board, text, name: meinName(), link: link || null, ...datei });
+    const k = await neuerSchluessel();
+    const { data, error } = await supabase.from('ideen')
+      .insert({ board, text, name: meinName(), link: link || null, loesch_hash: k ? k.hash : null, ...datei })
+      .select('id').single();
     if (error) throw error;
+    merkeEigenes('ideen', data.id, k);
+    const e = beitraege.get('i' + data.id);
+    if (e) { bearbeitenKnopf(e); loeschKnopf(e, 'ideen'); }
     $('text-feld').value = '';
     $('link-feld').value = '';
     setzeAnhang(null);
@@ -266,6 +339,86 @@ $('senden').addEventListener('click', async () => {
 });
 
 // ---------- Beiträge anzeigen ----------
+function inhaltSetzen(e, neu) {
+  e.daten = { ...e.daten, ...neu };
+  const d = e.daten;
+  const text = (d.text || '').trim();
+  e.textEl.replaceChildren();
+  if (text) textMitLinks(e.textEl, text);
+  e.textEl.hidden = !text || !!e.form;
+  if (d.link) {
+    let ziel = d.link;
+    try { ziel = new URL(d.link).hostname.replace(/^www\./, ''); } catch {}
+    e.linkEl.textContent = '🔗 ' + ziel;
+    e.linkEl.href = d.link;
+    e.linkEl.hidden = !!e.form;
+  } else {
+    e.linkEl.hidden = true;
+    e.linkEl.removeAttribute('href');
+  }
+  e.meta.textContent = (d.name || 'Anonym') + ' · ' + zeit(d.created_at) + (d.bearbeitet_am ? ' · bearbeitet' : '');
+}
+
+function loeschKnopf(e, tabelle) {
+  if (e.weg || !(bearbeitenModus || schluesselVon(tabelle, e.daten.id))) return;
+  const weg = element('button', 'loeschen-knopf', '🗑 Löschen');
+  weg.addEventListener('click', async () => {
+    if (!confirm('Diesen Beitrag wirklich löschen?')) return;
+    if (await loeschen(tabelle, e.daten.id)) beitragEntfernen(e.schluessel);
+  });
+  e.aktionen.append(weg);
+  e.weg = weg;
+}
+
+function bearbeitenKnopf(e) {
+  if (e.bearb || e.alt || !(bearbeitenModus || schluesselVon('ideen', e.daten.id))) return;
+  const knopf = element('button', 'kommentar-knopf', '✏️ Bearbeiten');
+  knopf.addEventListener('click', () => bearbeitenOeffnen(e));
+  e.aktionen.insertBefore(knopf, e.weg || null);
+  e.bearb = knopf;
+}
+
+function bearbeitenOeffnen(e) {
+  if (e.form) return;
+  const form = element('form', 'bearbeiten-form');
+  const feld = element('textarea');
+  feld.maxLength = 1000;
+  feld.value = e.daten.text || '';
+  const linkFeld = element('input');
+  linkFeld.maxLength = 500;
+  linkFeld.placeholder = 'Link (optional)';
+  linkFeld.value = e.daten.link || '';
+  const speichern = element('button', 'haupt', 'Speichern');
+  const abbrechen = element('button', '', 'Abbrechen');
+  abbrechen.type = 'button';
+  const zeile = element('div', 'zeile');
+  zeile.append(speichern, abbrechen);
+  form.append(feld, linkFeld, zeile);
+  e.meta.before(form);
+  e.form = form;
+  inhaltSetzen(e, {});
+
+  const schliessen = () => { form.remove(); e.form = null; inhaltSetzen(e, {}); };
+  abbrechen.addEventListener('click', schliessen);
+  form.addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const text = feld.value.trim();
+    let link = linkFeld.value.trim();
+    if (link && !/^https?:\/\//i.test(link)) link = 'https://' + link;
+    if (!text && !link && !e.daten.datei_url) { zeigeFehler('Ein Beitrag braucht Text, einen Link oder eine Datei.'); return; }
+    speichern.disabled = true;
+    const ok = await aendern('ideen', e.daten.id, text, link || null);
+    speichern.disabled = false;
+    if (ok) {
+      e.daten.text = text;
+      e.daten.link = link || null;
+      e.daten.bearbeitet_am = new Date().toISOString();
+      schliessen();
+    }
+  });
+  feld.focus();
+}
+
 function karteErstellen(schluessel, p, mitKommentaren) {
   const el = element('div', 'beitrag');
   el.style.background = ZETTELFARBEN[p.id % ZETTELFARBEN.length];
@@ -278,20 +431,11 @@ function karteErstellen(schluessel, p, mitKommentaren) {
     img.addEventListener('click', () => zeigeGross(p.datei_url));
     el.append(img);
   }
-  if (p.text && p.text.trim()) {
-    const text = element('p', 'text');
-    textMitLinks(text, p.text.trim());
-    el.append(text);
-  }
-  if (p.link) {
-    let ziel = p.link;
-    try { ziel = new URL(p.link).hostname.replace(/^www\./, ''); } catch {}
-    const a = element('a', 'anlage', '🔗 ' + ziel);
-    a.href = p.link;
-    a.target = '_blank';
-    a.rel = 'noopener';
-    el.append(a);
-  }
+  const textEl = element('p', 'text');
+  const linkEl = element('a', 'anlage');
+  linkEl.target = '_blank';
+  linkEl.rel = 'noopener';
+  el.append(textEl, linkEl);
   if (p.datei_url && !istBild(p.datei_typ)) {
     const a = element('a', 'anlage', '📎 ' + (p.datei_name || 'Datei'));
     a.href = p.datei_url;
@@ -299,9 +443,14 @@ function karteErstellen(schluessel, p, mitKommentaren) {
     a.rel = 'noopener';
     el.append(a);
   }
-  el.append(element('div', 'meta', (p.name || 'Anonym') + ' · ' + zeit(p.created_at)));
+  const meta = element('div', 'meta');
+  const aktionen = element('div', 'aktionen');
+  el.append(meta, aktionen);
 
-  const eintrag = { daten: p, el, kommentare: new Set(), liste: null, knopf: null };
+  const e = { schluessel, daten: p, alt: !mitKommentaren, el, textEl, linkEl, meta, aktionen,
+              kommentare: new Set(), liste: null, knopf: null, weg: null, bearb: null, form: null };
+  inhaltSetzen(e, {});
+
   if (mitKommentaren) {
     const knopf = element('button', 'kommentar-knopf');
     const bereich = element('div', 'kommentare');
@@ -313,20 +462,29 @@ function karteErstellen(schluessel, p, mitKommentaren) {
     input.required = true;
     input.placeholder = 'Kommentar …';
     form.append(input, element('button', '', 'Senden'));
-    form.addEventListener('submit', async e => {
-      e.preventDefault();
-      const { error } = await supabase.from('kommentare')
-        .insert({ idee_id: p.id, board, text: input.value.trim(), name: meinName() });
-      if (error) zeigeFehler(error.message); else input.value = '';
+    form.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      const k = await neuerSchluessel();
+      const { data, error } = await supabase.from('kommentare')
+        .insert({ idee_id: p.id, board, text: input.value.trim(), name: meinName(), loesch_hash: k ? k.hash : null })
+        .select('id').single();
+      if (error) { zeigeFehler(error.message); return; }
+      input.value = '';
+      merkeEigenes('kommentare', data.id, k);
+      const vorhanden = kommentarElemente.get(data.id);
+      if (vorhanden) kommentarKnoepfe(data.id, vorhanden);
     });
     bereich.append(liste, form);
     knopf.addEventListener('click', () => { bereich.hidden = !bereich.hidden; });
-    el.append(knopf, bereich);
-    eintrag.liste = liste;
-    eintrag.knopf = knopf;
+    aktionen.append(knopf);
+    el.append(bereich);
+    e.liste = liste;
+    e.knopf = knopf;
   }
-  beitraege.set(schluessel, eintrag);
-  aktualisiereKnopf(eintrag);
+  beitraege.set(schluessel, e);
+  bearbeitenKnopf(e);
+  loeschKnopf(e, mitKommentaren ? 'ideen' : 'notes');
+  aktualisiereKnopf(e);
   return el;
 }
 
@@ -349,15 +507,68 @@ function beitragEntfernen(schluessel) {
   $('leer').hidden = beitraege.size > 0;
 }
 
-function neuerKommentar(k) {
-  const e = beitraege.get('i' + k.idee_id);
-  if (!e || !e.liste || e.kommentare.has(k.id)) return;
-  e.kommentare.add(k.id);
+// ---------- Kommentare ----------
+function kommentarText(k) {
+  const d = k.daten;
+  k.wer.textContent = (d.name || 'Anonym') + ' · ' + zeit(d.created_at) + (d.bearbeitet_am ? ' · bearbeitet' : '');
+  k.textEl.replaceChildren();
+  textMitLinks(k.textEl, d.text || '');
+}
+
+function kommentarKnoepfe(id, k) {
+  if (k.weg || !(bearbeitenModus || schluesselVon('kommentare', id))) return;
+  const bearb = element('button', 'bearb', '✏️');
+  bearb.title = 'Kommentar bearbeiten';
+  bearb.addEventListener('click', async () => {
+    const neu = prompt('Kommentar bearbeiten:', k.daten.text);
+    if (neu === null || !neu.trim()) return;
+    const text = neu.trim().slice(0, 500);
+    if (await aendern('kommentare', id, text)) {
+      k.daten.text = text;
+      k.daten.bearbeitet_am = new Date().toISOString();
+      kommentarText(k);
+    }
+  });
+  const weg = element('button', 'weg', '✕');
+  weg.title = 'Kommentar löschen';
+  weg.addEventListener('click', async () => {
+    if (!confirm('Diesen Kommentar wirklich löschen?')) return;
+    if (await loeschen('kommentare', id)) kommentarEntfernen(id);
+  });
+  k.el.append(bearb, weg);
+  k.weg = weg;
+}
+
+function neuerKommentar(daten) {
+  const e = beitraege.get('i' + daten.idee_id);
+  if (!e || !e.liste || e.kommentare.has(daten.id)) return;
+  e.kommentare.add(daten.id);
   const box = element('div', 'kommentar');
-  box.append(element('span', 'wer', (k.name || 'Anonym') + ' · ' + zeit(k.created_at)));
-  textMitLinks(box, k.text);
+  const wer = element('span', 'wer');
+  const textEl = element('span');
+  box.append(wer, textEl);
   e.liste.append(box);
+  const k = { daten, el: box, wer, textEl, eintrag: e, weg: null };
+  kommentarElemente.set(daten.id, k);
+  kommentarText(k);
+  kommentarKnoepfe(daten.id, k);
   aktualisiereKnopf(e);
+}
+
+function kommentarAktualisieren(daten) {
+  const k = kommentarElemente.get(daten.id);
+  if (!k) return;
+  k.daten = { ...k.daten, ...daten };
+  kommentarText(k);
+}
+
+function kommentarEntfernen(id) {
+  const k = kommentarElemente.get(id);
+  if (!k) return;
+  k.el.remove();
+  k.eintrag.kommentare.delete(id);
+  aktualisiereKnopf(k.eintrag);
+  kommentarElemente.delete(id);
 }
 
 // ---------- Überschrift ----------
@@ -370,14 +581,12 @@ function zeigeThema(text) {
 if (bearbeitenModus) {
   $('steuerung').hidden = false;
   $('thema-speichern').addEventListener('click', async () => {
-    if (!pin) pin = prompt('Bitte deinen PIN eingeben:');
-    if (!pin) return;
     const text = $('thema-feld').value;
-    const { error } = await supabase.rpc('fall_speichern', { p_board: board, p_fall: 'frage', p_text: text, p_pin: pin });
-    if (error) { pin = null; zeigeFehler(error.message); return; }
-    zeigeThema(text);
-    $('thema-speichern').textContent = 'Gespeichert ✓';
-    setTimeout(() => { $('thema-speichern').textContent = 'Speichern'; }, 2000);
+    if (await mitPin(p => supabase.rpc('fall_speichern', { p_board: board, p_fall: 'frage', p_text: text, p_pin: p }))) {
+      zeigeThema(text);
+      $('thema-speichern').textContent = 'Gespeichert ✓';
+      setTimeout(() => { $('thema-speichern').textContent = 'Speichern'; }, 2000);
+    }
   });
 }
 
@@ -403,10 +612,18 @@ const nurBoard = 'board=eq.' + board;
 supabase.channel('pinnwand-' + board)
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ideen', filter: nurBoard },
       p => neuerBeitrag(p.new))
+  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'ideen', filter: nurBoard },
+      p => { const e = beitraege.get('i' + p.new.id); if (e && !e.form) inhaltSetzen(e, p.new); })
   .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'ideen' },
       p => beitragEntfernen('i' + p.old.id))
+  .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'notes' },
+      p => beitragEntfernen('n' + p.old.id))
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'kommentare', filter: nurBoard },
       p => neuerKommentar(p.new))
+  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'kommentare', filter: nurBoard },
+      p => kommentarAktualisieren(p.new))
+  .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'kommentare' },
+      p => kommentarEntfernen(p.old.id))
   .on('postgres_changes', { event: '*', schema: 'public', table: 'faelle', filter: nurBoard },
       p => { if (p.new && p.new.fall === 'frage') zeigeThema(p.new.beschreibung); })
   .subscribe(status => {

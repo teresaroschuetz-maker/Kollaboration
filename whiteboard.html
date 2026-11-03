@@ -35,7 +35,7 @@
                background: var(--flaeche); border: 1px solid var(--rahmen); border-radius: 14px;
                padding: .5rem .7rem; margin-bottom: .7rem; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
   .trenner { width: 1px; height: 1.6rem; background: var(--rahmen); margin: 0 .2rem; }
-  #farben { display: flex; gap: .35rem; }
+  #farben { display: flex; gap: .35rem; flex-wrap: wrap; }
   .farbe { width: 1.7rem; height: 1.7rem; padding: 0; border-radius: 50%; border: 2px solid var(--rahmen); }
   .farbe.aktiv { outline: 3px solid var(--akzent); outline-offset: 2px; }
   .hinweis { font-size: .85rem; color: var(--leise); }
@@ -57,8 +57,11 @@
   .bild-objekt { padding: 4px; background: #fff; border-radius: 6px; box-shadow: 0 4px 10px rgba(0,0,0,.15); box-sizing: border-box; }
   .bild-objekt img { display: block; width: 100%; height: auto; border-radius: 4px; pointer-events: none; }
   body:not(.lehrend) .objekt.gesperrt::after { content: '🔒'; position: absolute; top: -10px; right: -8px; font-size: .85rem; }
-  .schloss { position: absolute; top: -12px; right: -12px; width: 30px; height: 30px; padding: 0;
-             font-size: .85rem; box-shadow: 0 2px 6px rgba(0,0,0,.2); z-index: 4; }
+  .schloss, .weg-knopf { position: absolute; top: -12px; width: 30px; height: 30px; padding: 0;
+                         font-size: .85rem; box-shadow: 0 2px 6px rgba(0,0,0,.2); z-index: 4; }
+  .schloss { right: -12px; }
+  .weg-knopf { left: -12px; color: #8a1c14; }
+  body:not(.lehrend) .objekt.gesperrt .weg-knopf { display: none; }
 
   #gross { position: fixed; inset: 0; background: rgba(10,20,35,.85); display: flex; align-items: center;
            justify-content: center; padding: 1.5rem; z-index: 30; cursor: zoom-out; }
@@ -125,8 +128,7 @@ const flaeche = $('flaeche');
 const svg = $('linien');
 const SVGNS = 'http://www.w3.org/2000/svg';
 
-const objekte = new Map();   // Nummer -> { el, typ, gesperrt, zieht, schloss }
-const meine = [];            // eigene Objekte für „Rückgängig“
+const objekte = new Map();   // Nummer -> { el, typ, gesperrt, zieht, schloss, weg }
 let modus = 'zeigen';
 let stiftFarbe = STIFTFARBEN[0];
 let zettelFarbe = ZETTELFARBEN[0];
@@ -165,9 +167,55 @@ function zeigeGross(src) {
   $('gross').hidden = false;
 }
 
+// ---------- Eigene Objekte wiedererkennen ----------
+function eigeneLesen() { try { return JSON.parse(localStorage.getItem('eigene-schluessel') || '{}'); } catch { return {}; } }
+const eigene = eigeneLesen();
+function eigeneSpeichern() { try { localStorage.setItem('eigene-schluessel', JSON.stringify(eigene)); } catch {} }
+
+async function neuerSchluessel() {
+  if (!(window.crypto && crypto.subtle)) return null;
+  const hex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  const schluessel = hex(crypto.getRandomValues(new Uint8Array(16)));
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(schluessel));
+  return { schluessel, hash: hex(new Uint8Array(hash)) };
+}
+
+function merkeEigenes(id, k) {
+  if (!k) return;
+  eigene['whiteboard:' + id] = { s: k.schluessel, b: board, t: Date.now() };
+  eigeneSpeichern();
+  const o = objekte.get(id);
+  if (o) wegKnopfHinzufuegen(o, id);
+}
+
+const schluesselVon = id => (eigene['whiteboard:' + id] || {}).s || null;
+
+// Eigene Objekte dieser Tafel in der Reihenfolge ihres Entstehens
+function meineIds() {
+  return Object.entries(eigene)
+    .filter(([key, v]) => key.startsWith('whiteboard:') && v.b === board)
+    .sort((a, b) => a[1].t - b[1].t)
+    .map(([key]) => Number(key.slice('whiteboard:'.length)));
+}
+
+async function eigenesLoeschen(id) {
+  const s = schluesselVon(id);
+  if (!s) return false;
+  const { data, error } = await supabase.rpc('eigenes_loeschen', { p_tabelle: 'whiteboard', p_id: id, p_schluessel: s });
+  if (error) { zeigeFehler(error.message); return false; }
+  if (!data) { zeigeFehler('Das konnte nicht gelöscht werden (vielleicht ist es gesperrt).'); return false; }
+  delete eigene['whiteboard:' + id];
+  eigeneSpeichern();
+  return true;
+}
+
+function pinLoeschen(id) {
+  return mitPin(p => supabase.rpc('mit_pin_loeschen', { p_tabelle: 'whiteboard', p_id: id, p_pin: p }));
+}
+
 // ---------- Werkzeuge ----------
 const HINWEISE = {
-  zeigen: 'Zettel und Bilder verschieben. Bilder mit Cmd+V einfügen.',
+  zeigen: 'Zettel und Bilder verschieben, eigene Zettel per Doppelklick bearbeiten. Bilder mit Cmd+V einfügen.',
   stift:  'Auf die Fläche zeichnen.',
   zettel: 'Auf die Fläche tippen, wo der Zettel hin soll.',
 };
@@ -241,6 +289,21 @@ function schlossHinzufuegen(o, id) {
   o.schloss = knopf;
 }
 
+function wegKnopfHinzufuegen(o, id) {
+  if (o.weg || o.typ === 'linie' || !(bearbeitenModus || schluesselVon(id))) return;
+  const knopf = element('button', 'weg-knopf', '✕');
+  knopf.title = 'Löschen';
+  knopf.addEventListener('pointerdown', e => e.stopPropagation());
+  knopf.addEventListener('click', async e => {
+    e.stopPropagation();
+    if (!confirm(o.typ === 'bild' ? 'Dieses Bild löschen?' : 'Diesen Zettel löschen?')) return;
+    const ok = bearbeitenModus ? await pinLoeschen(id) : await eigenesLoeschen(id);
+    if (ok) objektEntfernen(id);
+  });
+  o.el.append(knopf);
+  o.weg = knopf;
+}
+
 function zeigeObjekt(z) {
   if (z.board !== board) return;
   const vorhanden = objekte.get(z.id);
@@ -249,12 +312,14 @@ function zeigeObjekt(z) {
       vorhanden.el.style.left = z.x + 'px';
       vorhanden.el.style.top = z.y + 'px';
     }
+    if (vorhanden.textEl && typeof z.text === 'string') vorhanden.textEl.textContent = z.text;
     if (typeof z.gesperrt === 'boolean') setzeSperre(vorhanden, z.gesperrt);
     return;
   }
   if (z.typ === 'bild' && !(typeof z.bild === 'string' && z.bild.startsWith('data:image/'))) return;
 
   let el;
+  let textEl = null;
   if (z.typ === 'linie') {
     el = neuerPfad(z.farbe);
     el.setAttribute('d', pfadText(z.punkte || []));
@@ -268,18 +333,22 @@ function zeigeObjekt(z) {
       el.style.width = (z.breite || BILD_BREITE) + 'px';
       el.addEventListener('dblclick', () => zeigeGross(z.bild));
     } else {
-      el = element('div', 'objekt zettel', z.text || '');
+      el = element('div', 'objekt zettel');
+      textEl = element('span', '', z.text || '');
+      el.append(textEl);
       el.style.background = z.farbe;
     }
     el.style.left = z.x + 'px';
     el.style.top = z.y + 'px';
     flaeche.append(el);
   }
-  const o = { el, typ: z.typ, gesperrt: false, zieht: false, schloss: null };
+  const o = { el, textEl, typ: z.typ, gesperrt: false, zieht: false, schloss: null, weg: null };
+  if (z.typ === 'zettel') el.addEventListener('dblclick', () => zettelBearbeiten(o, z.id));
   objekte.set(z.id, o);
   if (z.typ !== 'linie') {
     ziehbarMachen(o, z.id);
     if (bearbeitenModus) schlossHinzufuegen(o, z.id);
+    wegKnopfHinzufuegen(o, z.id);
   }
   setzeSperre(o, !!z.gesperrt);
 }
@@ -289,7 +358,27 @@ function objektEntfernen(id) {
   if (o) { o.el.remove(); objekte.delete(id); }
 }
 
-// Bilder sind groß und werden deshalb nach einer Live-Meldung frisch geladen
+// Eigenen Zettel per Doppelklick bearbeiten (du mit PIN: jeden Zettel)
+async function zettelBearbeiten(o, id) {
+  if (modus !== 'zeigen') return;
+  if (!bearbeitenModus && (!schluesselVon(id) || o.gesperrt)) return;
+  const neu = prompt('Zettel bearbeiten:', o.textEl.textContent);
+  if (neu === null || !neu.trim()) return;
+  const text = neu.trim().slice(0, 300);
+  let ok = false;
+  if (bearbeitenModus) {
+    ok = await mitPin(p => supabase.rpc('mit_pin_bearbeiten',
+      { p_tabelle: 'whiteboard', p_id: id, p_pin: p, p_text: text }));
+  } else {
+    const { data, error } = await supabase.rpc('eigenes_bearbeiten',
+      { p_tabelle: 'whiteboard', p_id: id, p_schluessel: schluesselVon(id), p_text: text });
+    if (error) zeigeFehler(error.message);
+    else if (!data) zeigeFehler('Das konnte nicht geändert werden.');
+    ok = !error && data;
+  }
+  if (ok) o.textEl.textContent = text;
+}
+
 async function nachladen(id) {
   const { data, error } = await supabase.from('whiteboard').select('*').eq('id', id).maybeSingle();
   if (error) zeigeFehler(error.message);
@@ -319,12 +408,13 @@ async function strichBeenden() {
   if (!s) return;
   if (s.punkte.length === 1) s.punkte.push([s.punkte[0][0] + 1, s.punkte[0][1]]);
   s.pfad.setAttribute('d', pfadText(s.punkte));
+  const k = await neuerSchluessel();
   const { data, error } = await supabase.from('whiteboard')
-    .insert({ board, typ: 'linie', farbe: s.farbe, punkte: s.punkte }).select().single();
+    .insert({ board, typ: 'linie', farbe: s.farbe, punkte: s.punkte, loesch_hash: k ? k.hash : null }).select().single();
   if (error) { s.pfad.remove(); zeigeFehler(error.message); return; }
   if (objekte.has(data.id)) s.pfad.remove();
-  else objekte.set(data.id, { el: s.pfad, typ: 'linie', gesperrt: false, zieht: false, schloss: null });
-  meine.push(data.id);
+  else objekte.set(data.id, { el: s.pfad, typ: 'linie', gesperrt: false, zieht: false, schloss: null, weg: null });
+  merkeEigenes(data.id, k);
 }
 flaeche.addEventListener('pointerup', strichBeenden);
 flaeche.addEventListener('pointercancel', strichBeenden);
@@ -335,13 +425,14 @@ flaeche.addEventListener('click', async e => {
   const [x, y] = punktVon(e);
   const text = prompt('Text für den Zettel:');
   if (!text || !text.trim()) return;
+  const k = await neuerSchluessel();
   const { data, error } = await supabase.from('whiteboard').insert({
     board, typ: 'zettel', farbe: zettelFarbe, text: text.trim().slice(0, 300),
-    x: Math.max(0, x - 85), y: Math.max(0, y - 30),
+    x: Math.max(0, x - 85), y: Math.max(0, y - 30), loesch_hash: k ? k.hash : null,
   }).select().single();
   if (error) { zeigeFehler(error.message); return; }
   zeigeObjekt(data);
-  meine.push(data.id);
+  merkeEigenes(data.id, k);
 });
 
 // ---------- Bilder einfügen ----------
@@ -379,11 +470,13 @@ async function bildEinfuegen(datei) {
     const r = $('rahmen');
     const x = Math.max(0, Math.round(r.scrollLeft + r.clientWidth / 2 - breite / 2));
     const y = Math.max(0, Math.round(r.scrollTop + r.clientHeight / 2 - 120));
+    const k = await neuerSchluessel();
     const { data, error } = await supabase.from('whiteboard')
-      .insert({ board, typ: 'bild', bild: daten, breite, x, y, farbe: '#ffffff' }).select().single();
+      .insert({ board, typ: 'bild', bild: daten, breite, x, y, farbe: '#ffffff', loesch_hash: k ? k.hash : null })
+      .select().single();
     if (error) { zeigeFehler(error.message); return; }
     zeigeObjekt(data);
-    meine.push(data.id);
+    merkeEigenes(data.id, k);
   } catch (err) {
     zeigeFehler(err.message);
   }
@@ -442,18 +535,11 @@ function ziehbarMachen(o, id) {
   });
 }
 
-// ---------- Rückgängig ----------
+// ---------- Rückgängig: eigenes zuletzt Erstelltes löschen ----------
 $('rueckgaengig').addEventListener('click', async () => {
-  while (meine.length) {
-    const letzte = objekte.get(meine[meine.length - 1]);
-    if (letzte && !letzte.gesperrt) break;
-    meine.pop();
-  }
-  const id = meine.pop();
+  const id = meineIds().reverse().find(i => objekte.has(i) && !objekte.get(i).gesperrt);
   if (!id) return;
-  objektEntfernen(id);
-  const { error } = await supabase.from('whiteboard').delete().eq('id', id);
-  if (error) zeigeFehler(error.message);
+  if (await eigenesLoeschen(id)) objektEntfernen(id);
 });
 
 // ---------- Thema und Steuerung ----------
