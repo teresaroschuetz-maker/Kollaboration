@@ -52,7 +52,11 @@
   .vorschlag h3 { margin: 0 0 .2rem; font-size: 1.25rem; white-space: pre-wrap; overflow-wrap: anywhere; }
   .pokal { display: none; font-weight: 700; margin-bottom: .4rem; }
   .gewinner .pokal { display: block; }
-  .meta { font-size: .85rem; color: var(--leise); margin-bottom: .8rem; }
+  .meta { font-size: .85rem; color: var(--leise); margin-bottom: .5rem; }
+  .eigene-knoepfe { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .8rem; }
+  .eigene-knoepfe:empty { display: none; }
+  .eigene-knoepfe button { padding: .25rem .7rem; font-size: .88rem; }
+  .eigene-knoepfe .entf { color: var(--contra); }
   .stimmzeile { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; margin-bottom: 1rem; }
   .stimme.meine { background: var(--akzent); border-color: var(--akzent); color: #fff; font-weight: 600; }
   .anzahl { color: var(--leise); white-space: nowrap; }
@@ -67,16 +71,24 @@
   .spalte h4 { margin: 0 0 .5rem; }
   .pro h4 { color: var(--pro); }
   .contra h4 { color: var(--contra); }
-  .argument { background: var(--flaeche); border-radius: 8px; padding: .45rem .6rem; margin-bottom: .4rem;
-              font-size: .95rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .argument { position: relative; background: var(--flaeche); border-radius: 8px; padding: .45rem 3.4rem .45rem .6rem;
+              margin-bottom: .4rem; font-size: .95rem; white-space: pre-wrap; overflow-wrap: anywhere; }
   .pro .argument { border-left: 4px solid var(--pro); }
   .contra .argument { border-left: 4px solid var(--contra); }
   .argument .wer { display: block; font-size: .8rem; color: var(--leise); }
+  .argument .bearb, .argument .entf { position: absolute; top: .2rem; padding: 0 .35rem; font-size: .85rem;
+                                      background: transparent; border: none; }
+  .argument .bearb { right: 1.7rem; }
+  .argument .entf { right: .25rem; color: var(--contra); }
   .spalte form { display: flex; gap: .4rem; margin-top: .5rem; }
   .spalte form input { flex: 1; min-width: 0; }
   .pro form button { background: var(--pro); border-color: var(--pro); color: #fff; }
   .contra form button { background: var(--contra); border-color: var(--contra); color: #fff; }
   .keine { color: var(--leise); font-style: italic; }
+  /* In der Phase „Beendet“ verschwinden die Knöpfe für Studierende */
+  body.beendet:not(.lehrend) .eigene-knoepfe,
+  body.beendet:not(.lehrend) .argument .bearb,
+  body.beendet:not(.lehrend) .argument .entf { display: none; }
 </style>
 </head>
 <body>
@@ -116,8 +128,10 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 // >>> Hier deine beiden Werte aus Teil 3 eintragen <<<
 const supabase = createClient('https://oeqlvlrnflqfevktfyuz.supabase.co', 'sb_publishable_x7jDXG-iMW23TDVUm9HSEA_bDANHESG');
 
+
 const board = location.hash.slice(1) || 'abstimmung';
 const bearbeitenModus = new URLSearchParams(location.search).has('bearbeiten');
+if (bearbeitenModus) document.body.classList.add('lehrend');
 const $ = id => document.getElementById(id);
 
 const PHASEN = {
@@ -126,9 +140,10 @@ const PHASEN = {
   beendet:   { knopf: 'Beendet',               hinweis: 'Die Abstimmung ist beendet.' },
 };
 
-const vorschlaege = new Map();  // Nummer -> Vorschlag
+const vorschlaege = new Map();
 const karten = new Map();
-const stimmen = new Map();      // Person -> Nummer des Vorschlags (als Text)
+const argumentElemente = new Map();
+const stimmen = new Map();
 let phase = 'offen';
 let sortierung = 'neu';
 let pin = null;
@@ -170,6 +185,55 @@ $('name-feld').value = lesen('ideen-name') || '';
 $('name-feld').addEventListener('input', () => schreiben('ideen-name', $('name-feld').value));
 const meinName = () => $('name-feld').value.trim() || null;
 
+// ---------- Eigene Beiträge wiedererkennen (Bearbeiten und Löschen) ----------
+function eigeneLesen() { try { return JSON.parse(localStorage.getItem('eigene-schluessel') || '{}'); } catch { return {}; } }
+const eigene = eigeneLesen();
+function eigeneSpeichern() { try { localStorage.setItem('eigene-schluessel', JSON.stringify(eigene)); } catch {} }
+
+async function neuerSchluessel() {
+  if (!(window.crypto && crypto.subtle)) return null;
+  const hex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  const schluessel = hex(crypto.getRandomValues(new Uint8Array(16)));
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(schluessel));
+  return { schluessel, hash: hex(new Uint8Array(hash)) };
+}
+
+function merkeEigenes(tabelle, id, k) {
+  if (!k) return;
+  eigene[tabelle + ':' + id] = { s: k.schluessel, b: board, t: Date.now() };
+  eigeneSpeichern();
+}
+
+const schluesselVon = (tabelle, id) => (eigene[tabelle + ':' + id] || {}).s || null;
+const darf = (tabelle, id) => bearbeitenModus || !!schluesselVon(tabelle, id);
+
+async function loeschen(tabelle, id) {
+  if (bearbeitenModus) {
+    return mitPin(p => supabase.rpc('mit_pin_loeschen', { p_tabelle: tabelle, p_id: id, p_pin: p }));
+  }
+  const s = schluesselVon(tabelle, id);
+  if (!s) return false;
+  const { data, error } = await supabase.rpc('eigenes_loeschen', { p_tabelle: tabelle, p_id: id, p_schluessel: s });
+  if (error) { zeigeFehler(error.message); return false; }
+  if (!data) { zeigeFehler('Das konnte nicht gelöscht werden.'); return false; }
+  delete eigene[tabelle + ':' + id];
+  eigeneSpeichern();
+  return true;
+}
+
+async function aendern(tabelle, id, text) {
+  if (bearbeitenModus) {
+    return mitPin(p => supabase.rpc('mit_pin_bearbeiten', { p_tabelle: tabelle, p_id: id, p_pin: p, p_text: text }));
+  }
+  const s = schluesselVon(tabelle, id);
+  if (!s) return false;
+  const { data, error } = await supabase.rpc('eigenes_bearbeiten',
+    { p_tabelle: tabelle, p_id: id, p_schluessel: s, p_text: text });
+  if (error) { zeigeFehler(error.message); return false; }
+  if (!data) { zeigeFehler('Das konnte nicht geändert werden.'); return false; }
+  return true;
+}
+
 // ---------- Sortierung ----------
 function baueSortierung() {
   const s = $('sortierung');
@@ -194,19 +258,70 @@ function argumentSpalte(v, art, titel) {
   form.append(input, element('button', '', '+'));
   form.addEventListener('submit', async e => {
     e.preventDefault();
-    const { error } = await supabase.from('kommentare')
-      .insert({ idee_id: v.id, board, text: input.value.trim(), name: meinName(), art });
-    if (error) zeigeFehler(error.message); else input.value = '';
+    const k = await neuerSchluessel();
+    const { data, error } = await supabase.from('kommentare')
+      .insert({ idee_id: v.id, board, text: input.value.trim(), name: meinName(), art, loesch_hash: k ? k.hash : null })
+      .select('id').single();
+    if (error) { zeigeFehler(error.message); return; }
+    input.value = '';
+    merkeEigenes('kommentare', data.id, k);
+    const vorhanden = argumentElemente.get(data.id);
+    if (vorhanden) argumentKnoepfe(vorhanden);
   });
   spalte.append(liste, form);
   return { spalte, liste, form };
 }
 
+function vorschlagZeigen(v) {
+  const k = karten.get(v.id);
+  k.titel.textContent = v.text;
+  k.meta.textContent = (v.name || 'Anonym') + ' · ' + zeit(v.created_at) + (v.bearbeitet_am ? ' · bearbeitet' : '');
+}
+
+function stimmenFuer(id) {
+  let n = 0;
+  for (const a of stimmen.values()) if (a === String(id)) n++;
+  return n;
+}
+
+function vorschlagKnoepfe(v) {
+  const k = karten.get(v.id);
+  if (k.knoepfe || !darf('ideen', v.id)) return;
+  const bearb = element('button', '', '✏️ Bearbeiten');
+  bearb.addEventListener('click', async () => {
+    const neu = prompt('Vorschlag bearbeiten:', v.text);
+    if (neu === null || !neu.trim()) return;
+    const text = neu.trim().slice(0, 300);
+    if (await aendern('ideen', v.id, text)) {
+      v.text = text;
+      v.bearbeitet_am = new Date().toISOString();
+      vorschlagZeigen(v);
+    }
+  });
+  const entf = element('button', 'entf', '🗑 Löschen');
+  entf.addEventListener('click', async () => {
+    if (!bearbeitenModus) {
+      const fremdeArgumente = [...v.argumente].some(id => !schluesselVon('kommentare', id));
+      const fremdeStimmen = stimmenFuer(v.id) - (stimmen.get(person) === String(v.id) ? 1 : 0);
+      if (fremdeArgumente || fremdeStimmen > 0) {
+        zeigeFehler('Dieser Vorschlag kann nicht mehr gelöscht werden, weil schon andere dafür gestimmt oder dazu argumentiert haben. Bitte wende dich an die Lehrperson.');
+        return;
+      }
+    }
+    if (!confirm('Diesen Vorschlag wirklich löschen?')) return;
+    if (await loeschen('ideen', v.id)) { vorschlagEntfernen(v.id); zeichne(); }
+  });
+  k.eigene.append(bearb, entf);
+  k.knoepfe = true;
+}
+
 function karteErstellen(v) {
   const el = element('div', 'vorschlag');
   el.append(element('div', 'pokal', '🏆 Meiste Stimmen'));
-  el.append(element('h3', '', v.text));
-  el.append(element('div', 'meta', (v.name || 'Anonym') + ' · ' + zeit(v.created_at)));
+  const titel = element('h3');
+  const meta = element('div', 'meta');
+  const eigeneBox = element('div', 'eigene-knoepfe');
+  el.append(titel, meta, eigeneBox);
 
   const stimmzeile = element('div', 'stimmzeile');
   const knopf = element('button', 'stimme');
@@ -224,13 +339,9 @@ function karteErstellen(v) {
   argumente.append(pro.spalte, contra.spalte);
   el.append(argumente);
 
-  karten.set(v.id, { el, knopf, anzahl, fuellung, pro, contra });
-}
-
-function stimmenFuer(id) {
-  let n = 0;
-  for (const a of stimmen.values()) if (a === String(id)) n++;
-  return n;
+  karten.set(v.id, { el, titel, meta, eigene: eigeneBox, knopf, anzahl, fuellung, pro, contra, knoepfe: false });
+  vorschlagZeigen(v);
+  vorschlagKnoepfe(v);
 }
 
 function zeichne() {
@@ -239,6 +350,7 @@ function zeichne() {
   const max = Math.max(0, ...zaehlung.values());
   const meine = stimmen.get(person);
   const geschlossen = phase === 'beendet';
+  document.body.classList.toggle('beendet', geschlossen);
 
   const sortiert = [...vorschlaege.values()].sort((a, b) => {
     if (sortierung === 'stimmen' && zaehlung.get(b.id) !== zaehlung.get(a.id)) return zaehlung.get(b.id) - zaehlung.get(a.id);
@@ -278,6 +390,14 @@ function neuerVorschlag(z) {
   karteErstellen(v);
 }
 
+function vorschlagAktualisieren(z) {
+  const v = vorschlaege.get(z.id);
+  if (!v) return;
+  v.text = z.text;
+  v.bearbeitet_am = z.bearbeitet_am;
+  vorschlagZeigen(v);
+}
+
 function vorschlagEntfernen(id) {
   const k = karten.get(id);
   if (k) k.el.remove();
@@ -285,14 +405,65 @@ function vorschlagEntfernen(id) {
   vorschlaege.delete(id);
 }
 
+function argumentZeigen(a) {
+  const d = a.daten;
+  a.wer.textContent = (d.name || 'Anonym') + ' · ' + zeit(d.created_at) + (d.bearbeitet_am ? ' · bearbeitet' : '');
+  a.textEl.textContent = d.text;
+}
+
+function argumentKnoepfe(a) {
+  const id = a.daten.id;
+  if (a.knoepfe || !darf('kommentare', id)) return;
+  const bearb = element('button', 'bearb', '✏️');
+  bearb.title = 'Argument bearbeiten';
+  bearb.addEventListener('click', async () => {
+    const neu = prompt('Argument bearbeiten:', a.daten.text);
+    if (neu === null || !neu.trim()) return;
+    const text = neu.trim().slice(0, 300);
+    if (await aendern('kommentare', id, text)) {
+      a.daten.text = text;
+      a.daten.bearbeitet_am = new Date().toISOString();
+      argumentZeigen(a);
+    }
+  });
+  const entf = element('button', 'entf', '✕');
+  entf.title = 'Argument löschen';
+  entf.addEventListener('click', async () => {
+    if (!confirm('Dieses Argument wirklich löschen?')) return;
+    if (await loeschen('kommentare', id)) argumentEntfernen(id);
+  });
+  a.el.append(bearb, entf);
+  a.knoepfe = true;
+}
+
 function neuesArgument(z) {
   const v = vorschlaege.get(z.idee_id);
   if (!v || !z.art || v.argumente.has(z.id)) return;
   v.argumente.add(z.id);
   const box = element('div', 'argument');
-  box.append(element('span', 'wer', (z.name || 'Anonym') + ' · ' + zeit(z.created_at)));
-  box.append(z.text);
+  const wer = element('span', 'wer');
+  const textEl = element('span');
+  box.append(wer, textEl);
   karten.get(v.id)[z.art].liste.append(box);
+  const a = { daten: z, el: box, wer, textEl, v, knoepfe: false };
+  argumentElemente.set(z.id, a);
+  argumentZeigen(a);
+  argumentKnoepfe(a);
+}
+
+function argumentAktualisieren(z) {
+  const a = argumentElemente.get(z.id);
+  if (!a) return;
+  a.daten = { ...a.daten, ...z };
+  argumentZeigen(a);
+}
+
+function argumentEntfernen(id) {
+  const a = argumentElemente.get(id);
+  if (!a) return;
+  a.el.remove();
+  a.v.argumente.delete(id);
+  argumentElemente.delete(id);
 }
 
 function verarbeiteEinstellung(z) {
@@ -312,8 +483,14 @@ function verarbeiteEinstellung(z) {
 $('vorschlag-senden').addEventListener('click', async () => {
   const text = $('vorschlag-feld').value.trim();
   if (!text) return;
-  const { error } = await supabase.from('ideen').insert({ board, text, name: meinName() });
-  if (error) zeigeFehler(error.message); else $('vorschlag-feld').value = '';
+  const k = await neuerSchluessel();
+  const { data, error } = await supabase.from('ideen')
+    .insert({ board, text, name: meinName(), loesch_hash: k ? k.hash : null }).select('id').single();
+  if (error) { zeigeFehler(error.message); return; }
+  $('vorschlag-feld').value = '';
+  merkeEigenes('ideen', data.id, k);
+  const v = vorschlaege.get(data.id);
+  if (v) vorschlagKnoepfe(v);
 });
 
 async function abstimmen(v) {
@@ -382,10 +559,16 @@ const nurBoard = 'board=eq.' + board;
 supabase.channel('abstimmung-' + board)
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ideen', filter: nurBoard },
       p => { neuerVorschlag(p.new); zeichne(); })
+  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'ideen', filter: nurBoard },
+      p => vorschlagAktualisieren(p.new))
   .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'ideen' },
       p => { vorschlagEntfernen(p.old.id); zeichne(); })
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'kommentare', filter: nurBoard },
       p => neuesArgument(p.new))
+  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'kommentare', filter: nurBoard },
+      p => argumentAktualisieren(p.new))
+  .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'kommentare' },
+      p => argumentEntfernen(p.old.id))
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'stimmen', filter: nurBoard },
       p => { stimmen.set(p.new.person, p.new.antwort); zeichne(); })
   .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'stimmen', filter: nurBoard },
