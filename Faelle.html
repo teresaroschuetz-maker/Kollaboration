@@ -32,7 +32,13 @@
   .gruppe { border-top: 1px solid #d5e3f3; padding: .8rem 0 .4rem; }
   .gruppe h3 { margin: 0 0 .5rem; font-size: 1rem; color: #1d4f8a; }
   .liste { display: flex; flex-direction: column; gap: .4rem; margin-bottom: .5rem; }
-  .note { background: #fff4c2; color: #14243a; padding: .5rem .7rem; border-radius: 6px; white-space: pre-wrap; }
+  .note { position: relative; background: #fff4c2; color: #14243a; padding: .5rem 3.4rem .5rem .7rem;
+          border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .note .vermerk { font-size: .75rem; color: #5a6b80; }
+  .note .klein { position: absolute; top: .3rem; padding: 0 .35rem; font-size: .85rem; background: transparent;
+                 color: #14243a; border: none; border-radius: 4px; }
+  .note .bearb { right: 1.7rem; }
+  .note .entf { right: .2rem; color: #8a1c14; }
   .gruppe form { display: flex; gap: .4rem; }
   .gruppe input { flex: 1; padding: .45rem; font-size: 1rem; min-width: 0; border: 1px solid #c5d8ef; border-radius: 6px; }
   button { padding: .45rem .9rem; font-size: 1rem; cursor: pointer; background: #1d5fa8; color: #fff;
@@ -78,6 +84,7 @@ const bearbeitenModus = new URLSearchParams(location.search).has('bearbeiten');
 const $ = id => document.getElementById(id);
 const listen = {};
 const bereiche = {};
+const beitragElemente = new Map();   // Beitrags-Nummer -> Beitrag auf der Seite
 let pin = null;
 
 // ---------- Hilfsfunktionen ----------
@@ -108,7 +115,6 @@ function bilderLesen(text) {
   } catch { return []; }
 }
 
-// Bild verkleinern und als Text (Data-URL) zurückgeben
 function bildVerkleinern(datei) {
   return new Promise((fertig, fehler) => {
     const url = URL.createObjectURL(datei);
@@ -130,11 +136,59 @@ function bildVerkleinern(datei) {
   });
 }
 
-// Bild groß anzeigen
 $('gross').addEventListener('click', () => { $('gross').hidden = true; });
 function zeigeGross(src) {
   $('gross').querySelector('img').src = src;
   $('gross').hidden = false;
+}
+
+// ---------- Eigene Beiträge wiedererkennen (Bearbeiten und Löschen) ----------
+function eigeneLesen() { try { return JSON.parse(localStorage.getItem('eigene-schluessel') || '{}'); } catch { return {}; } }
+const eigene = eigeneLesen();
+function eigeneSpeichern() { try { localStorage.setItem('eigene-schluessel', JSON.stringify(eigene)); } catch {} }
+
+async function neuerSchluessel() {
+  if (!(window.crypto && crypto.subtle)) return null;
+  const hex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  const schluessel = hex(crypto.getRandomValues(new Uint8Array(16)));
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(schluessel));
+  return { schluessel, hash: hex(new Uint8Array(hash)) };
+}
+
+function merkeEigenes(tabelle, id, k) {
+  if (!k) return;
+  eigene[tabelle + ':' + id] = { s: k.schluessel, b: board, t: Date.now() };
+  eigeneSpeichern();
+}
+
+const schluesselVon = (tabelle, id) => (eigene[tabelle + ':' + id] || {}).s || null;
+const darf = (tabelle, id) => bearbeitenModus || !!schluesselVon(tabelle, id);
+
+async function loeschen(tabelle, id) {
+  if (bearbeitenModus) {
+    return mitPin(p => supabase.rpc('mit_pin_loeschen', { p_tabelle: tabelle, p_id: id, p_pin: p }));
+  }
+  const s = schluesselVon(tabelle, id);
+  if (!s) return false;
+  const { data, error } = await supabase.rpc('eigenes_loeschen', { p_tabelle: tabelle, p_id: id, p_schluessel: s });
+  if (error) { zeigeFehler(error.message); return false; }
+  if (!data) { zeigeFehler('Das konnte nicht gelöscht werden.'); return false; }
+  delete eigene[tabelle + ':' + id];
+  eigeneSpeichern();
+  return true;
+}
+
+async function aendern(tabelle, id, text) {
+  if (bearbeitenModus) {
+    return mitPin(p => supabase.rpc('mit_pin_bearbeiten', { p_tabelle: tabelle, p_id: id, p_pin: p, p_text: text }));
+  }
+  const s = schluesselVon(tabelle, id);
+  if (!s) return false;
+  const { data, error } = await supabase.rpc('eigenes_bearbeiten',
+    { p_tabelle: tabelle, p_id: id, p_schluessel: s, p_text: text });
+  if (error) { zeigeFehler(error.message); return false; }
+  if (!data) { zeigeFehler('Das konnte nicht geändert werden.'); return false; }
+  return true;
 }
 
 // ---------- Fälle aufbauen ----------
@@ -210,8 +264,15 @@ for (const fall of FAELLE) {
     form.append(input, element('button', '', 'Senden'));
     form.addEventListener('submit', async e => {
       e.preventDefault();
-      const { error } = await supabase.from('notes').insert({ board, kachel: schluessel, text: input.value });
-      if (error) zeigeFehler(error.message); else input.value = '';
+      const k = await neuerSchluessel();
+      const { data, error } = await supabase.from('notes')
+        .insert({ board, kachel: schluessel, text: input.value.trim(), loesch_hash: k ? k.hash : null })
+        .select('id').single();
+      if (error) { zeigeFehler(error.message); return; }
+      input.value = '';
+      merkeEigenes('notes', data.id, k);
+      const vorhanden = beitragElemente.get(data.id);
+      if (vorhanden) beitragKnoepfe(vorhanden);
     });
     gruppe.append(element('h3', '', name), liste, form);
     box.append(gruppe);
@@ -220,7 +281,7 @@ for (const fall of FAELLE) {
   $('faelle').append(box);
 }
 
-// ---------- Bilder anzeigen ----------
+// ---------- Bilder ----------
 function zeichneBilder(fallId) {
   const b = bereiche[fallId];
   const liste = bearbeitenModus ? b.entwurf : b.bilder;
@@ -281,13 +342,64 @@ async function fallSpeichern(fall, knopf) {
   }
 }
 
-// ---------- Daten verarbeiten ----------
-function addNote(note) {
-  const liste = listen[note.kachel];
-  if (!liste) return;
-  liste.append(element('div', 'note', note.text));
+// ---------- Gruppenbeiträge ----------
+function beitragZeigen(b) {
+  b.textEl.textContent = b.daten.text;
+  b.vermerk.textContent = b.daten.bearbeitet_am ? ' (bearbeitet)' : '';
 }
 
+function beitragKnoepfe(b) {
+  const id = b.daten.id;
+  if (b.knoepfe || !darf('notes', id)) return;
+  const bearb = element('button', 'klein bearb', '✏️');
+  bearb.title = 'Bearbeiten';
+  bearb.addEventListener('click', async () => {
+    const neu = prompt('Beitrag bearbeiten:', b.daten.text);
+    if (neu === null || !neu.trim()) return;
+    const text = neu.trim().slice(0, 500);
+    if (await aendern('notes', id, text)) {
+      b.daten.text = text;
+      b.daten.bearbeitet_am = new Date().toISOString();
+      beitragZeigen(b);
+    }
+  });
+  const entf = element('button', 'klein entf', '✕');
+  entf.title = 'Löschen';
+  entf.addEventListener('click', async () => {
+    if (!confirm('Diesen Beitrag wirklich löschen?')) return;
+    if (await loeschen('notes', id)) beitragEntfernen(id);
+  });
+  b.el.append(bearb, entf);
+  b.knoepfe = true;
+}
+
+function addNote(note) {
+  const liste = listen[note.kachel];
+  if (!liste || beitragElemente.has(note.id)) return;
+  const el = element('div', 'note');
+  const textEl = element('span');
+  const vermerk = element('span', 'vermerk');
+  el.append(textEl, vermerk);
+  liste.append(el);
+  const b = { daten: note, el, textEl, vermerk, knoepfe: false };
+  beitragElemente.set(note.id, b);
+  beitragZeigen(b);
+  beitragKnoepfe(b);
+}
+
+function beitragAktualisieren(note) {
+  const b = beitragElemente.get(note.id);
+  if (!b) return;
+  b.daten = { ...b.daten, ...note };
+  beitragZeigen(b);
+}
+
+function beitragEntfernen(id) {
+  const b = beitragElemente.get(id);
+  if (b) { b.el.remove(); beitragElemente.delete(id); }
+}
+
+// ---------- Fallbeschreibungen ----------
 function verarbeiteFall(zeile) {
   for (const fall of FAELLE) {
     const b = bereiche[fall.id];
@@ -304,7 +416,6 @@ function verarbeiteFall(zeile) {
   }
 }
 
-// Große Einträge (Bilder) werden nach einer Live-Meldung frisch geladen
 async function nachladen(fallName) {
   const { data, error } = await supabase.from('faelle').select('*')
     .eq('board', board).eq('fall', fallName).maybeSingle();
@@ -321,10 +432,15 @@ if (beitraege.error) zeigeFehler(beitraege.error.message); else beitraege.data.f
 if (texte.error) zeigeFehler(texte.error.message); else texte.data.forEach(verarbeiteFall);
 
 // ---------- Live-Aktualisierung ----------
+const nurBoard = 'board=eq.' + board;
 supabase.channel('fallarbeit-' + board)
-  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notes', filter: 'board=eq.' + board },
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notes', filter: nurBoard },
       p => addNote(p.new))
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'faelle', filter: 'board=eq.' + board },
+  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notes', filter: nurBoard },
+      p => beitragAktualisieren(p.new))
+  .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'notes' },
+      p => beitragEntfernen(p.old.id))
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'faelle', filter: nurBoard },
       p => {
         if (!p.new || !p.new.fall) return;
         if (p.new.fall.endsWith('-bilder')) nachladen(p.new.fall);
