@@ -17,7 +17,7 @@
   .symbol { font-size: 2.2rem; line-height: 1; }
   .kachel h2 { margin: .7rem 0 .3rem; font-size: 1.2rem; }
   .kachel p { margin: 0; color: #555; font-size: .95rem; }
-    /* >>> Farbdesign Startseite: Schiefer <<< */
+  /* >>> Farbdesign Startseite: Schiefer <<< */
   body { background: #eef1f5; color: #1c2733; }
   h1 { color: #243b53; }
   .untertitel, .kachel p { color: #52606d; }
@@ -45,7 +45,6 @@ const TOOLS = [
 { symbol: '🌳', titel: 'Argumentbaum', text: 'These mit Pro und Contra diskutieren', link: 'verwaltung.html?tool=baum', farbe: '#37474f' },
 { symbol: '🖍️', titel: 'Whiteboard', text: 'Gemeinsam zeichnen und Zettel ordnen', link: 'verwaltung.html?tool=tafel', farbe: '#1e3a5f' },
 ];
-
 const bereich = document.getElementById('kacheln');
 for (const tool of TOOLS) {
   const kachel = document.createElement('a');
@@ -63,10 +62,6 @@ for (const tool of TOOLS) {
 
   kachel.append(symbol, titel, text);
   bereich.append(kachel);
-  <footer style="text-align:center; font: .85rem system-ui, sans-serif; padding: 1.5rem 1rem; color: #555;">
-  <a href="impressum.html" style="color: inherit;">Impressum</a> ·
-  <a href="datenschutz.html" style="color: inherit;">Datenschutz</a>
-</footer>
 }
 </script>
 </body>
