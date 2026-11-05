@@ -587,6 +587,10 @@ supabase.channel('ideen-' + board)
     if (status === 'SUBSCRIBED') $('status').textContent = bearbeitenModus
       ? '● Live verbunden – Bearbeiten-Modus' : '● Live verbunden';
     else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') $('status').textContent = '○ Keine Live-Verbindung (siehe Teil 6)';
+    <footer style="text-align:center; font: .85rem system-ui, sans-serif; padding: 1.5rem 1rem; color: #555;">
+  <a href="impressum.html" style="color: inherit;">Impressum</a> ·
+  <a href="datenschutz.html" style="color: inherit;">Datenschutz</a>
+</footer>
   });
 </script>
 </body>
