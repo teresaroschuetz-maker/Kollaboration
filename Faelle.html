@@ -61,16 +61,16 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1/+esm';
 
 // >>> Hier deine Fälle anpassen <<<
-const FAELLE = [
-  { id: 'fall1', titel: 'Fall 1' },
-  { id: 'fall2', titel: 'Fall 2' },
-  { id: 'fall3', titel: 'Fall 3' },
-  { id: 'fall4', titel: 'Fall 4' },
-  { id: 'fall5', titel: 'Fall 5' },
+// >>> Voreinstellung und Höchstzahl für Fälle und Gruppen <<<
+const STANDARD_FAELLE = 5;
+const STANDARD_GRUPPEN = 6;
+const MAX_FAELLE = 12;
+const MAX_GRUPPEN = 12;
+let FAELLE = [];
+let GRUPPEN = [];
+let aufbauText = '';
 ];
 
-// >>> Hier die Gruppen anpassen <<<
-const GRUPPEN = ['Gruppe 1', 'Gruppe 2', 'Gruppe 3', 'Gruppe 4', 'Gruppe 5', 'Gruppe 6'];
 
 // >>> Bilder: höchstens so viele pro Fall, und so breit (in Pixeln) werden sie gespeichert <<<
 const MAX_BILDER = 4;
@@ -191,6 +191,45 @@ async function aendern(tabelle, id, text) {
   return true;
 }
 
+  // ---------- Anzahl der Fälle und Gruppen ----------
+{
+const { data } = await supabase.from('faelle').select('beschreibung')
+.eq('board', board).eq('fall', 'aufbau').maybeSingle();
+aufbauText = data ? data.beschreibung : '';
+const [f, g] = aufbauText.split(';').map(Number);
+const anzahlFaelle = f >= 1 && f <= MAX_FAELLE ? f : STANDARD_FAELLE;
+const anzahlGruppen = g >= 1 && g <= MAX_GRUPPEN ? g : STANDARD_GRUPPEN;
+FAELLE = Array.from({ length: anzahlFaelle }, (_, i) => ({ id: 'fall' + (i + 1), titel: 'Fall ' + (i + 1) }));
+GRUPPEN = Array.from({ length: anzahlGruppen }, (_, i) => 'Gruppe ' + (i + 1));
+
+if (bearbeitenModus) {
+const box = element('div', 'fall');
+box.style.marginBottom = '1.5rem';
+box.append(element('h2', '', 'Aufbau'));
+const zeile = element('div', 'zeile');
+const zahlFeld = (wert, max) => {
+const feld = element('input');
+feld.type = 'number'; feld.min = 1; feld.max = max; feld.value = wert;
+feld.style.width = '5rem'; feld.style.padding = '.4rem';
+return feld;
+};
+const feldF = zahlFeld(anzahlFaelle, MAX_FAELLE);
+const feldG = zahlFeld(anzahlGruppen, MAX_GRUPPEN);
+const knopf = element('button', '', 'Übernehmen');
+const beschriftung = text => { const l = element('label', '', text); l.style.alignSelf = 'center'; return l; };
+zeile.append(beschriftung('Fälle:'), feldF, beschriftung('Gruppen pro Fall:'), feldG, knopf);
+box.append(zeile, element('p', 'bild-hinweis',
+'Weniger Fälle oder Gruppen blenden nur aus. Bereits geschriebene Beiträge bleiben gespeichert und erscheinen wieder, wenn du die Zahl erhöhst.'));
+knopf.addEventListener('click', async () => {
+const nf = Math.min(MAX_FAELLE, Math.max(1, Math.round(Number(feldF.value) || STANDARD_FAELLE)));
+const ng = Math.min(MAX_GRUPPEN, Math.max(1, Math.round(Number(feldG.value) || STANDARD_GRUPPEN)));
+const ok = await mitPin(p => supabase.rpc('fall_speichern',
+{ p_board: board, p_fall: 'aufbau', p_text: nf + ';' + ng, p_pin: p }));
+if (ok) location.reload();
+});
+$('faelle').before(box);
+}
+}
 // ---------- Fälle aufbauen ----------
 for (const fall of FAELLE) {
   const box = element('div', 'fall');
@@ -401,6 +440,10 @@ function beitragEntfernen(id) {
 
 // ---------- Fallbeschreibungen ----------
 function verarbeiteFall(zeile) {
+if (zeile.fall === 'aufbau') {
+if ((zeile.beschreibung || '') !== aufbauText) location.reload();
+return;
+}
   for (const fall of FAELLE) {
     const b = bereiche[fall.id];
     if (zeile.fall === fall.id) {
