@@ -190,7 +190,7 @@ function zeigeFrage(text) {
 if (bearbeitenModus) {
   $('frage-bearbeiten').hidden = false;
   $('frage-speichern').addEventListener('click', async () => {
-    if (!pin) pin = prompt('login eingeben:');
+    if (!pin) pin = ('login');
     if (!pin) return;
     const { error } = await supabase.rpc('fall_speichern',
       { p_board: board, p_fall: 'frage', p_text: $('frage-feld').value, p_pin: pin });
