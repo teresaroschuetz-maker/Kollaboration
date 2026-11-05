@@ -177,7 +177,7 @@ function textMitLinks(el, text) {
 }
 
 async function mitPin(aktion) {
-  if (!pin) pin = prompt('login:');
+  if (!pin) pin = prompt('login');
   if (!pin) return false;
   const { error } = await aktion(pin);
   if (error) { pin = null; zeigeFehler(error.message); return false; }
@@ -613,11 +613,12 @@ supabase.channel('ideen-' + board)
     if (status === 'SUBSCRIBED') $('status').textContent = bearbeitenModus
       ? '● Live verbunden – Bearbeiten-Modus' : '● Live verbunden';
     else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') $('status').textContent = '○ Keine Live-Verbindung (siehe Teil 6)';
-    <footer style="text-align:center; font: .85rem system-ui, sans-serif; padding: 1.5rem 1rem; color: #555;">
+    
+  });
+</script>
+  <footer style="text-align:center; font: .85rem system-ui, sans-serif; padding: 1.5rem 1rem; color: #555;">
   <a href="impressum.html" style="color: inherit;">Impressum</a> ·
   <a href="datenschutz.html" style="color: inherit;">Datenschutz</a>
 </footer>
-  });
-</script>
 </body>
 </html>
