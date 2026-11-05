@@ -5,68 +5,131 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Verwaltung</title>
 <style>
-  body { font-family: system-ui, sans-serif; margin: 0; background: #f4f1ea; color: #222; }
-  main { max-width: 800px; margin: 0 auto; padding: 2rem 1.5rem; }
-  a.zurueck { color: #2f6fb3; text-decoration: none; }
-  h1 { margin: .8rem 0 1.5rem; }
-  .box { background: #fff; border-radius: 10px; padding: 1.2rem; box-shadow: 0 2px 6px rgba(0,0,0,.1);
-         margin-bottom: 1.5rem; }
-  .box h2 { margin: 0 0 .8rem; font-size: 1.15rem; }
-  .zeile { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .6rem; }
-  input { padding: .5rem; font-size: 1rem; flex: 1; min-width: 12rem; }
-  button { padding: .5rem .9rem; font-size: 1rem; cursor: pointer; border-radius: 6px;
-           border: 1px solid #bbb; background: #fff; color: #222; }
-  button.haupt { background: #2f6fb3; color: #fff; border-color: #2f6fb3; }
-  .hinweis { font-size: .9rem; color: #666; margin: 0; }
-  #fehler { background: #fbebeb; color: #a00; padding: .8rem; border-radius: 6px; margin-bottom: 1rem; }
-  .eintrag { background: #fff; border-radius: 10px; padding: 1rem; box-shadow: 0 2px 6px rgba(0,0,0,.1);
-             margin-bottom: .8rem; }
-  .eintrag.neu { outline: 3px solid #f2c94c; }
-  .eintrag h3 { margin: 0 0 .2rem; font-size: 1.1rem; }
-  .eintrag .info { font-size: .9rem; color: #666; margin-bottom: .6rem; overflow-wrap: anywhere; white-space: pre-line; }
-  .knoepfe { display: flex; gap: .4rem; flex-wrap: wrap; }
-  #leer { color: #888; font-style: italic; }
-    /* >>> Farbdesign Verwaltung: Grau-Blau <<< */
-  body { background: #eceff3; color: #1f2933; }
-  a.zurueck { color: #3d5a80; }
-  .hinweis, .eintrag .info, #leer { color: #52606d; }
-  button { border-radius: 999px; }
-  button.haupt { background: #3d5a80; border-color: #3d5a80; color: #fff; }
-  .eintrag.neu { outline-color: #e0a800; }
+[hidden] { display: none !important; }
+body { font-family: system-ui, sans-serif; margin: 0; background: #f4f1ea; color: #222; }
+main { max-width: 800px; margin: 0 auto; padding: 2rem 1.5rem; }
+a.zurueck { color: #2f6fb3; text-decoration: none; }
+h1 { margin: .8rem 0 1.5rem; }
+.box { background: #fff; border-radius: 10px; padding: 1.2rem; box-shadow: 0 2px 6px rgba(0,0,0,.1);
+margin-bottom: 1.5rem; }
+.box h2 { margin: 0 0 .8rem; font-size: 1.15rem; }
+.zeile { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .6rem; }
+input, select { padding: .5rem; font-size: 1rem; flex: 1; min-width: 12rem; }
+button { padding: .5rem .9rem; font-size: 1rem; cursor: pointer; border-radius: 6px;
+border: 1px solid #bbb; background: #fff; color: #222; }
+button.haupt { background: #2f6fb3; color: #fff; border-color: #2f6fb3; }
+button:disabled { opacity: .6; cursor: wait; }
+.hinweis { font-size: .9rem; color: #666; margin: 0; }
+#fehler { background: #fbebeb; color: #a00; padding: .8rem; border-radius: 6px; margin-bottom: 1rem; }
+#meldung { background: #e6f4ea; color: #1e5e32; padding: .8rem; border-radius: 6px; margin-bottom: 1rem; }
+.eintrag { background: #fff; border-radius: 10px; padding: 1rem; box-shadow: 0 2px 6px rgba(0,0,0,.1);
+margin-bottom: .8rem; }
+.eintrag.neu { outline: 3px solid #f2c94c; }
+.eintrag h3 { margin: 0 0 .2rem; font-size: 1.1rem; }
+.eintrag .info { font-size: .9rem; color: #666; margin-bottom: .6rem; overflow-wrap: anywhere; white-space: pre-line; }
+.eintrag .fremd { display: inline-block; font-size: .8rem; background: #fff4c2; color: #5c4600;
+padding: .1rem .5rem; border-radius: 999px; margin-bottom: .4rem; }
+.knoepfe { display: flex; gap: .4rem; flex-wrap: wrap; }
+#leer { color: #888; font-style: italic; }
+/* Kopfzeile nach dem Anmelden */
+#kopf { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem;
+background: #fff; border-radius: 10px; padding: .7rem 1rem; box-shadow: 0 2px 6px rgba(0,0,0,.08);
+margin-top: 1rem; }
+#kopf .wer { font-size: .95rem; overflow-wrap: anywhere; }
+#kopf .knoepfe button, #kopf .knoepfe a { font-size: .9rem; padding: .35rem .8rem; }
+#kopf a.knopf { display: inline-block; text-decoration: none; border: 1px solid #bbb; border-radius: 6px;
+color: inherit; background: #fff; }
+.marke { display: inline-block; font-size: .75rem; background: #3d5a80; color: #fff; padding: .1rem .5rem;
+border-radius: 999px; margin-left: .3rem; vertical-align: middle; }
+.schalter { display: flex; align-items: center; gap: .5rem; margin: 0 0 1rem; font-size: .95rem; }
+.schalter input { flex: none; min-width: 0; width: 1.1rem; height: 1.1rem; }
+.liste-kopf { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+
+/* >>> Farbdesign Verwaltung: Grau-Blau <<< */
+body { background: #eceff3; color: #1f2933; }
+a.zurueck { color: #3d5a80; }
+.hinweis, .eintrag .info, #leer { color: #52606d; }
+button { border-radius: 999px; }
+button.haupt { background: #3d5a80; border-color: #3d5a80; color: #fff; }
+.eintrag.neu { outline-color: #e0a800; }
+#kopf a.knopf { border-radius: 999px; }
 </style>
 </head>
 <body>
 <main>
-  <a class="zurueck" href="index.html">← Alle Tools</a>
-  <h1 id="titel">Verwaltung</h1>
-  <div id="fehler" hidden></div>
+<a class="zurueck" href="index.html">← Alle Tools</a>
 
-  <div class="box" id="anmelden">
-    <h2>Anmelden</h2>
-    <div class="zeile">
-      <input id="pin-feld" type="password" placeholder="Dein PIN">
-      <button id="pin-knopf" class="haupt">Weiter</button>
-    </div>
-    <p class="hinweis">Derselbe PIN wie bei der Fallarbeit.</p>
-  </div>
+<div id="kopf" hidden>
+<div class="wer">Angemeldet als <strong id="wer"></strong><span id="admin-marke" class="marke" hidden>Administratorin</span></div>
+<div class="knoepfe">
+<a id="zur-auswertung" class="knopf" href="auswertung.html" hidden>📈 Auswertung</a>
+<button id="passwort-oeffnen">Passwort ändern</button>
+<button id="abmelden">Abmelden</button>
+</div>
+</div>
 
-  <div id="bereich" hidden>
-    <div class="box">
-      <h2>Neu erstellen</h2>
-      <div class="zeile">
-        <input id="titel-feld" maxlength="100" placeholder="Titel, z. B. Seminar Montag">
-      </div>
-      <div class="zeile">
-        <input id="code-feld" maxlength="40" placeholder="Code (leer lassen = Zufallscode)">
-        <button id="erstellen" class="haupt">Erstellen und öffnen</button>
-      </div>
-      <p class="hinweis">Einen eigenen Code brauchst du nur, um eine schon bestehende Sammlung
-        (z. B. seminar-montag) in die Liste aufzunehmen.</p>
-    </div>
-    <h2>Deine Sammlungen</h2>
-    <p id="leer" hidden>Noch nichts erstellt.</p>
-    <div id="liste"></div>
-  </div>
+<h1 id="titel">Verwaltung</h1>
+<div id="fehler" hidden></div>
+<div id="meldung" hidden></div>
+
+<div class="box" id="anmelden" hidden>
+<h2>Anmelden</h2>
+<form id="anmelde-form">
+<div class="zeile">
+<input id="benutzer-feld" autocomplete="username" placeholder="E-Mail oder Benutzername" required>
+</div>
+<div class="zeile">
+<input id="passwort-feld" type="password" autocomplete="current-password" placeholder="Passwort" required>
+<button id="anmelde-knopf" class="haupt" type="submit">Anmelden</button>
+</div>
+</form>
+<p class="hinweis">Deine Zugangsdaten bekommst du von der Administratorin. Studierende brauchen keine Anmeldung.</p>
+</div>
+
+<div class="box" id="passwort-box" hidden>
+<h2>Passwort ändern</h2>
+<p class="hinweis" id="passwort-hinweis" hidden style="margin-bottom:.8rem">
+Du bist mit einem Startpasswort angemeldet. Bitte vergib jetzt ein eigenes Passwort.</p>
+<form id="passwort-form">
+<div class="zeile">
+<input id="neu-1" type="password" autocomplete="new-password" placeholder="Neues Passwort (mind. 8 Zeichen)" required>
+</div>
+<div class="zeile">
+<input id="neu-2" type="password" autocomplete="new-password" placeholder="Neues Passwort wiederholen" required>
+<button class="haupt" id="passwort-knopf" type="submit">Speichern</button>
+<button type="button" id="passwort-abbrechen">Später</button>
+</div>
+</form>
+</div>
+
+<div id="bereich" hidden>
+<div class="box">
+<h2>Neu erstellen</h2>
+<div class="zeile" id="tool-zeile" hidden>
+<select id="tool-feld"></select>
+</div>
+<div class="zeile">
+<input id="titel-feld" maxlength="100" placeholder="Titel, z. B. Seminar Montag">
+</div>
+<div class="zeile">
+<input id="code-feld" maxlength="40" placeholder="Code (leer lassen = Zufallscode)">
+<button id="erstellen" class="haupt">Erstellen und öffnen</button>
+</div>
+<p class="hinweis">Einen eigenen Code brauchst du nur, wenn der Link gut lesbar sein soll
+(z. B. seminar-montag). Erlaubt sind Kleinbuchstaben, Ziffern und Bindestriche.</p>
+</div>
+
+<label class="schalter" id="alle-zeile" hidden>
+<input type="checkbox" id="alle-feld"> Sammlungen aller Personen anzeigen
+</label>
+
+<div class="liste-kopf">
+<h2 id="liste-titel">Deine Sammlungen</h2>
+<a id="alle-tools" class="zurueck" href="verwaltung.html" hidden>Alle Tools anzeigen →</a>
+</div>
+<p id="leer" hidden>Noch nichts erstellt.</p>
+<div id="liste"></div>
+</div>
 </main>
 
 <script type="module">
@@ -74,162 +137,290 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 // >>> Hier deine Tools eintragen (Dateinamen genau wie auf GitHub) <<<
 const TOOLS = {
-  pinnwand:   { name: 'Pinnwand',                 datei: 'pinnwand.html',     bearbeiten: true },
-  fallarbeit: { name: 'Fallarbeit',               datei: 'Faelle.html',       bearbeiten: true },
-  ideen:      { name: 'Ideensammlung',            datei: 'ideen.html',        bearbeiten: true },
-  fragen:     { name: 'Ideen zu mehreren Fragen', datei: 'ideen-3fragen.html', bearbeiten: true },
-  schritte:   { name: 'Fragen Schritt für Schritt', datei: 'fragen-schritt.html', bearbeiten: true },
-  wolke:      { name: 'Wortwolke', datei: 'wortwolke.html', bearbeiten: true },
-  umfrage:    { name: 'Live-Umfrage', datei: 'umfrage.html', bearbeiten: true },
-  abstimmung: { name: 'Abstimmung mit Pro und Contra', datei: 'abstimmung.html', bearbeiten: true },
-  baum:       { name: 'Argumentbaum', datei: 'argumentbaum.html', bearbeiten: true },
-  tafel:      { name: 'Whiteboard', datei: 'whiteboard.html', bearbeiten: true },
+pinnwand: { name: 'Pinnwand', datei: 'pinnwand.html', bearbeiten: true },
+fallarbeit: { name: 'Fallarbeit', datei: 'Faelle.html', bearbeiten: true },
+ideen: { name: 'Ideensammlung', datei: 'ideen.html', bearbeiten: true },
+fragen: { name: 'Ideen zu mehreren Fragen', datei: 'ideen-3fragen.html', bearbeiten: true },
+schritte: { name: 'Fragen Schritt für Schritt', datei: 'fragen-schritt.html', bearbeiten: true },
+wolke: { name: 'Wortwolke', datei: 'wortwolke.html', bearbeiten: true },
+umfrage: { name: 'Live-Umfrage', datei: 'umfrage.html', bearbeiten: true },
+abstimmung: { name: 'Abstimmung mit Pro und Contra', datei: 'abstimmung.html', bearbeiten: true },
+baum: { name: 'Argumentbaum', datei: 'argumentbaum.html', bearbeiten: true },
+tafel: { name: 'Whiteboard', datei: 'whiteboard.html', bearbeiten: true },
 };
+
+// >>> Endung für Benutzernamen: "kollegin1" wird zu "kollegin1@tools.test" <<<
+const BENUTZER_ENDUNG = '@tools.test';
 
 // >>> Hier deine beiden Werte aus Teil 3 eintragen <<<
 const supabase = createClient('https://oeqlvlrnflqfevktfyuz.supabase.co', 'sb_publishable_x7jDXG-iMW23TDVUm9HSEA_bDANHESG');
 
+
 const $ = id => document.getElementById(id);
 const toolId = new URLSearchParams(location.search).get('tool');
-const tool = TOOLS[toolId];
-let pin = null;
+const tool = toolId ? TOOLS[toolId] : null;
+let nutzer = null;
+let istAdmin = false;
 let neuId = null;
 
 function zeigeFehler(text) {
-  $('fehler').textContent = 'Fehler: ' + text;
-  $('fehler').hidden = false;
+$('meldung').hidden = true;
+$('fehler').textContent = 'Fehler: ' + text;
+$('fehler').hidden = false;
+}
+
+function zeigeMeldung(text) {
+$('fehler').hidden = true;
+$('meldung').textContent = text;
+$('meldung').hidden = false;
+setTimeout(() => { $('meldung').hidden = true; }, 5000);
 }
 
 function element(tag, klasse, text) {
-  const el = document.createElement(tag);
-  if (klasse) el.className = klasse;
-  if (text) el.textContent = text;
-  return el;
+const el = document.createElement(tag);
+if (klasse) el.className = klasse;
+if (text) el.textContent = text;
+return el;
 }
 
-function linkFuer(code, bearbeiten) {
-  return new URL(tool.datei + (bearbeiten ? '?bearbeiten' : '') + '#' + code, location.href).href;
+function linkFuer(t, code, bearbeiten) {
+return new URL(t.datei + (bearbeiten ? '?bearbeiten' : '') + '#' + code, location.href).href;
 }
 
 // Zufallscode aus gut lesbaren Zeichen (ohne 0/o, 1/l/i)
 function zufallsCode() {
-  const zeichen = 'abcdefghjkmnpqrstuvwxyz23456789';
-  const zahlen = crypto.getRandomValues(new Uint32Array(8));
-  return Array.from(zahlen, z => zeichen[z % zeichen.length]).join('');
+const zeichen = 'abcdefghjkmnpqrstuvwxyz23456789';
+const zahlen = crypto.getRandomValues(new Uint32Array(8));
+return Array.from(zahlen, z => zeichen[z % zeichen.length]).join('');
 }
 
 function eigenerCode(text) {
-  return text.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+return text.trim().toLowerCase()
+.replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+.replace(/-+/g, '-').replace(/^-|-$/g, '');
+}
+
+function uebersetze(meldung) {
+if (/Invalid login credentials/i.test(meldung)) return 'Benutzername oder Passwort stimmt nicht.';
+if (/Email not confirmed/i.test(meldung)) return 'Dieses Konto ist noch nicht bestätigt. Bitte bei der Administratorin melden.';
+if (/should be different/i.test(meldung)) return 'Das neue Passwort muss sich vom alten unterscheiden.';
+if (/at least|weak|short/i.test(meldung)) return 'Das Passwort ist zu kurz oder zu einfach.';
+if (/Failed to fetch|NetworkError|Load failed/i.test(meldung)) return 'Keine Verbindung zur Datenbank. Bitte Internet prüfen und neu laden.';
+if (/JWT|session/i.test(meldung)) return 'Deine Anmeldung ist abgelaufen. Bitte neu anmelden.';
+return meldung;
 }
 
 async function kopieren(text, knopf) {
-  try {
-    await navigator.clipboard.writeText(text);
-    const alt = knopf.textContent;
-    knopf.textContent = 'Kopiert ✓';
-    setTimeout(() => { knopf.textContent = alt; }, 2000);
-  } catch {
-    prompt('Link kopieren:', text);
-  }
+try {
+await navigator.clipboard.writeText(text);
+const alt = knopf.textContent;
+knopf.textContent = 'Kopiert ✓';
+setTimeout(() => { knopf.textContent = alt; }, 2000);
+} catch {
+prompt('Link kopieren:', text);
+}
 }
 
 // ---------- Liste laden und anzeigen ----------
 async function ladeListe() {
-  const { data, error } = await supabase.rpc('sammlung_liste', { p_tool: toolId, p_pin: pin });
-  if (error) { zeigeFehler(error.message); return false; }
-  $('fehler').hidden = true;
-  $('liste').replaceChildren();
-  $('leer').hidden = data.length > 0;
+const alle = istAdmin && $('alle-feld').checked;
+const { data, error } = await supabase.rpc('sammlung_liste', { p_tool: toolId, p_alle: alle });
+if (error) { zeigeFehler(uebersetze(error.message)); return false; }
+$('liste').replaceChildren();
+$('leer').hidden = data.length > 0;
+$('liste-titel').textContent = alle ? 'Sammlungen aller Personen' : 'Deine Sammlungen';
 
-  for (const e of data) {
-    const karte = element('div', 'eintrag' + (e.id === neuId ? ' neu' : ''));
-    karte.append(element('h3', '', e.titel || 'Ohne Titel'));
-    const datum = new Date(e.created_at).toLocaleDateString('de-AT');
-    karte.append(element('div', 'info',
-      'Code: ' + e.code + ' · erstellt am ' + datum + '\nLink für Studierende: ' + linkFuer(e.code, false)));
+for (const e of data) {
+const t = TOOLS[e.tool];
+const karte = element('div', 'eintrag' + (e.id === neuId ? ' neu' : ''));
+if (!e.meine) karte.append(element('div', 'fremd', 'Gehört: ' + e.besitzerin));
+karte.append(element('h3', '', e.titel || 'Ohne Titel'));
+const datum = new Date(e.created_at).toLocaleDateString('de-AT');
+let info = (toolId ? '' : (t ? t.name : 'Tool „' + e.tool + '“') + ' · ')
++ 'Code: ' + e.code + ' · erstellt am ' + datum;
+if (t) info += '\nLink für Studierende: ' + linkFuer(t, e.code, false);
+karte.append(element('div', 'info', info));
 
-    const knoepfe = element('div', 'knoepfe');
-    const oeffnen = element('button', 'haupt', 'Öffnen');
-    oeffnen.addEventListener('click', () => window.open(linkFuer(e.code, false), '_blank'));
-    knoepfe.append(oeffnen);
+const knoepfe = element('div', 'knoepfe');
+if (t) {
+const oeffnen = element('button', 'haupt', 'Öffnen');
+oeffnen.addEventListener('click', () => window.open(linkFuer(t, e.code, false), '_blank'));
+knoepfe.append(oeffnen);
 
-    if (tool.bearbeiten) {
-      const bearbeiten = element('button', '', 'Bearbeiten');
-      bearbeiten.addEventListener('click', () => window.open(linkFuer(e.code, true), '_blank'));
-      knoepfe.append(bearbeiten);
-    }
+if (t.bearbeiten) {
+const bearbeiten = element('button', '', 'Bearbeiten');
+bearbeiten.addEventListener('click', () => window.open(linkFuer(t, e.code, true), '_blank'));
+knoepfe.append(bearbeiten);
+}
 
-    const kopie = element('button', '', 'Link für Studierende kopieren');
-    kopie.addEventListener('click', () => kopieren(linkFuer(e.code, false), kopie));
-    knoepfe.append(kopie);
+const kopie = element('button', '', 'Link für Studierende kopieren');
+kopie.addEventListener('click', () => kopieren(linkFuer(t, e.code, false), kopie));
+knoepfe.append(kopie);
+}
 
-    const weg = element('button', '', 'Aus Liste entfernen');
-    weg.addEventListener('click', async () => {
-      if (!confirm('„' + (e.titel || e.code) + '“ aus der Liste entfernen? Die Beiträge selbst bleiben gespeichert.')) return;
-      const { error } = await supabase.rpc('sammlung_entfernen', { p_id: e.id, p_pin: pin });
-      if (error) zeigeFehler(error.message); else ladeListe();
-    });
-    knoepfe.append(weg);
+const weg = element('button', '', 'Aus Liste entfernen');
+weg.addEventListener('click', async () => {
+if (!confirm('„' + (e.titel || e.code) + '“ aus der Liste entfernen?\n\n'
++ 'Die Beiträge bleiben gespeichert und der Link für Studierende funktioniert weiter. '
++ 'Bearbeiten kann die Sammlung danach aber nur noch die Administratorin.')) return;
+const { error } = await supabase.rpc('sammlung_entfernen', { p_id: e.id });
+if (error) zeigeFehler(uebersetze(error.message)); else ladeListe();
+});
+knoepfe.append(weg);
 
-    karte.append(knoepfe);
-    $('liste').append(karte);
-  }
-  return true;
+karte.append(knoepfe);
+$('liste').append(karte);
+}
+return true;
+}
+
+// ---------- Ansicht je nach Anmeldung ----------
+async function zeigeAngemeldet(user) {
+nutzer = user;
+$('wer').textContent = user.email;
+$('anmelden').hidden = true;
+$('kopf').hidden = false;
+$('bereich').hidden = false;
+
+const { data } = await supabase.rpc('ist_admin');
+istAdmin = data === true;
+$('admin-marke').hidden = !istAdmin;
+$('zur-auswertung').hidden = !istAdmin;
+$('alle-zeile').hidden = !istAdmin;
+
+// Beim ersten Anmelden mit dem Startpasswort: eigenes Passwort vorschlagen
+if (!user.user_metadata?.passwort_geaendert) {
+$('passwort-hinweis').hidden = false;
+$('passwort-box').hidden = false;
+}
+await ladeListe();
+}
+
+function zeigeAbgemeldet() {
+nutzer = null;
+istAdmin = false;
+$('kopf').hidden = true;
+$('bereich').hidden = true;
+$('passwort-box').hidden = true;
+$('liste').replaceChildren();
+$('anmelden').hidden = false;
 }
 
 // ---------- Anmelden ----------
-async function anmelden(eingabe) {
-  pin = eingabe;
-  if (!pin) return;
-  if (await ladeListe()) {
-    try { sessionStorage.setItem('verwaltung-pin', pin); } catch {}
-    $('anmelden').hidden = true;
-    $('bereich').hidden = false;
-  } else {
-    pin = null;
-  }
-}
+$('anmelde-form').addEventListener('submit', async ev => {
+ev.preventDefault();
+let email = $('benutzer-feld').value.trim().toLowerCase();
+if (email && !email.includes('@')) email += BENUTZER_ENDUNG;
+const knopf = $('anmelde-knopf');
+knopf.disabled = true;
+const { data, error } = await supabase.auth.signInWithPassword({ email, password: $('passwort-feld').value });
+knopf.disabled = false;
+if (error) { zeigeFehler(uebersetze(error.message)); return; }
+$('fehler').hidden = true;
+$('passwort-feld').value = '';
+zeigeAngemeldet(data.user);
+});
 
-$('pin-knopf').addEventListener('click', () => anmelden($('pin-feld').value.trim()));
-$('pin-feld').addEventListener('keydown', e => { if (e.key === 'Enter') anmelden($('pin-feld').value.trim()); });
+// ---------- Abmelden ----------
+$('abmelden').addEventListener('click', async () => {
+await supabase.auth.signOut();
+zeigeAbgemeldet();
+zeigeMeldung('Du bist abgemeldet.');
+});
+
+// ---------- Passwort ändern ----------
+$('passwort-oeffnen').addEventListener('click', () => {
+$('passwort-hinweis').hidden = true;
+$('passwort-box').hidden = false;
+$('neu-1').focus();
+});
+$('passwort-abbrechen').addEventListener('click', () => {
+$('passwort-box').hidden = true;
+$('neu-1').value = '';
+$('neu-2').value = '';
+});
+$('passwort-form').addEventListener('submit', async ev => {
+ev.preventDefault();
+const p1 = $('neu-1').value;
+const p2 = $('neu-2').value;
+if (p1.length < 8) { zeigeFehler('Das neue Passwort muss mindestens 8 Zeichen lang sein.'); return; }
+if (p1 !== p2) { zeigeFehler('Die beiden Passwörter stimmen nicht überein.'); return; }
+const knopf = $('passwort-knopf');
+knopf.disabled = true;
+const { error } = await supabase.auth.updateUser({ password: p1, data: { passwort_geaendert: true } });
+knopf.disabled = false;
+if (error) { zeigeFehler(uebersetze(error.message)); return; }
+$('neu-1').value = '';
+$('neu-2').value = '';
+$('passwort-box').hidden = true;
+zeigeMeldung('Dein neues Passwort ist gespeichert.');
+});
+
+// ---------- Alle Personen (nur Administratorin) ----------
+$('alle-feld').addEventListener('change', ladeListe);
 
 // ---------- Neu erstellen ----------
 $('erstellen').addEventListener('click', async () => {
-  // Den neuen Tab sofort öffnen, sonst blockiert Safari ihn
-  const fenster = window.open('', '_blank');
-  const code = eigenerCode($('code-feld').value) || zufallsCode();
-  const { data, error } = await supabase.rpc('sammlung_anlegen',
-    { p_tool: toolId, p_code: code, p_titel: $('titel-feld').value.trim(), p_pin: pin });
-  if (error) {
-    if (fenster) fenster.close();
-    zeigeFehler(error.message.includes('duplicate')
-      ? 'Diesen Code gibt es schon. Bitte einen anderen wählen.' : error.message);
-    return;
-  }
-  neuId = data.id;
-  const link = linkFuer(code, tool.bearbeiten);
-  if (fenster) fenster.location.href = link; else window.open(link, '_blank');
-  $('titel-feld').value = '';
-  $('code-feld').value = '';
-  ladeListe();
+const id = toolId || $('tool-feld').value;
+const t = TOOLS[id];
+if (!t) { zeigeFehler('Bitte zuerst ein Tool auswählen.'); return; }
+// Den neuen Tab sofort öffnen, sonst blockiert Safari ihn
+const fenster = window.open('', '_blank');
+const code = eigenerCode($('code-feld').value) || zufallsCode();
+const { data, error } = await supabase.rpc('sammlung_anlegen',
+{ p_tool: id, p_code: code, p_titel: $('titel-feld').value.trim() });
+if (error) {
+if (fenster) fenster.close();
+zeigeFehler(uebersetze(error.message));
+return;
+}
+$('fehler').hidden = true;
+neuId = data.id;
+const link = linkFuer(t, code, t.bearbeiten);
+if (fenster) fenster.location.href = link; else window.open(link, '_blank');
+$('titel-feld').value = '';
+$('code-feld').value = '';
+ladeListe();
+});
+
+// ---------- Abgelaufene Anmeldung oder Abmelden in einem anderen Tab ----------
+supabase.auth.onAuthStateChange((ereignis, session) => {
+if (ereignis === 'SIGNED_OUT' && nutzer) zeigeAbgemeldet();
 });
 
 // ---------- Start ----------
-if (!tool) {
-  $('titel').textContent = 'Unbekanntes Tool';
-  $('anmelden').hidden = true;
-  zeigeFehler('Im Link fehlt ?tool=… oder dieser Name steht nicht in der Liste TOOLS.');
+if (toolId && !tool) {
+$('titel').textContent = 'Unbekanntes Tool';
+$('alle-tools').hidden = false;
+zeigeFehler('Im Link steht ?tool=' + toolId + ', dieser Name steht aber nicht in der Liste TOOLS.');
 } else {
-  $('titel').textContent = tool.name;
-  document.title = tool.name + ' – Verwaltung';
-  let gemerkt = null;
-  try { gemerkt = sessionStorage.getItem('verwaltung-pin'); } catch {}
-  if (gemerkt) anmelden(gemerkt);
-  <footer style="text-align:center; font: .85rem system-ui, sans-serif; padding: 1.5rem 1rem; color: #555;">
-  <a href="impressum.html" style="color: inherit;">Impressum</a> ·
-  <a href="datenschutz.html" style="color: inherit;">Datenschutz</a>
-</footer>
+if (tool) {
+$('titel').textContent = tool.name;
+document.title = tool.name + ' – Verwaltung';
+$('alle-tools').hidden = false;
+} else {
+$('titel').textContent = 'Meine Sammlungen';
+document.title = 'Meine Sammlungen – Verwaltung';
+$('tool-zeile').hidden = false;
+const leer = element('option', '', 'Tool auswählen …');
+leer.value = '';
+$('tool-feld').append(leer);
+for (const [id, t] of Object.entries(TOOLS)) {
+const option = element('option', '', t.name);
+option.value = id;
+$('tool-feld').append(option);
+}
+}
+const { data } = await supabase.auth.getSession();
+if (data.session) zeigeAngemeldet(data.session.user);
+else zeigeAbgemeldet();
 }
 </script>
+
+<footer style="text-align:center; font: .85rem system-ui, sans-serif; padding: 1.5rem 1rem; color: #555;">
+<a href="impressum.html" style="color: inherit;">Impressum</a> ·
+<a href="datenschutz.html" style="color: inherit;">Datenschutz</a>
+</footer>
 </body>
 </html>
