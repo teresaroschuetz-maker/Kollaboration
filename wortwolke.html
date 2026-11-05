@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wortwolke</title>
+<style>
+  /* >>> Farben: Beere <<< */
+  :root {
+    --hintergrund: #fbeef3;
+    --flaeche:     #ffffff;
+    --text:        #2a1420;
+    --leise:       #6e5562;
+    --rahmen:      #efcfdc;
+    --akzent:      #a3195b;
+  }
+
+  body { font-family: system-ui, sans-serif; margin: 0; background: var(--hintergrund); color: var(--text); }
+  main { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+  #status { font-size: .9rem; color: var(--leise); margin-bottom: .8rem; }
+  #fehler { background: #fbebeb; color: #a00; padding: .8rem; border-radius: 8px; margin-bottom: 1rem; }
+  #frage { font-size: 1.8rem; text-align: center; margin: .5rem 0 1.5rem; white-space: pre-wrap; color: var(--akzent); }
+  #frage.leer { color: var(--leise); font-weight: 400; font-style: italic; }
+  .box { background: var(--flaeche); border: 1px solid var(--rahmen); border-radius: 14px;
+         padding: 1rem 1.2rem; margin-bottom: 1.5rem; }
+  .bearbeiten { display: grid; gap: .5rem; justify-items: start; }
+  textarea { width: 100%; box-sizing: border-box; min-height: 3.5rem; padding: .6rem; font: inherit;
+             border: 1px solid var(--rahmen); border-radius: 8px; }
+  .eingabe { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: center; }
+  .eingabe input { flex: 1; min-width: 12rem; max-width: 28rem; padding: .6rem .9rem; font-size: 1.1rem;
+                   border: 1px solid var(--rahmen); border-radius: 999px; }
+  input:focus, textarea:focus { outline: 2px solid var(--akzent); outline-offset: 1px; }
+  button { padding: .6rem 1.2rem; font-size: 1rem; cursor: pointer; border-radius: 999px; border: none;
+           background: var(--akzent); color: #fff; font-weight: 600; }
+  button:disabled { opacity: .45; cursor: default; }
+  .hinweis { text-align: center; font-size: .9rem; color: var(--leise); margin: .6rem 0 0; }
+  #wolke { background: var(--flaeche); border: 1px solid var(--rahmen); border-radius: 18px; min-height: 320px;
+           padding: 2rem 1.5rem; display: flex; flex-wrap: wrap; justify-content: center;
+           align-items: center; align-content: center; gap: .4rem 1.1rem; }
+  .wort { font-weight: 700; line-height: 1.1; overflow-wrap: anywhere; cursor: default; }
+  .wort.neu { animation: auftauchen .6s ease-out; }
+  @keyframes auftauchen { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: scale(1); } }
+  .leer-text { color: var(--leise); font-style: italic; }
+  #anzahl { text-align: center; color: var(--leise); font-size: .9rem; margin-top: .6rem; }
+  body.beamer .eingabe-box { display: none; }
+  body.beamer #frage { font-size: 2.4rem; }
+</style>
+</head>
+<body>
+<main>
+  <div id="status">Verbinde …</div>
+  <div id="fehler" hidden></div>
+  <h1 id="frage" class="leer">Noch keine Frage eingetragen.</h1>
+
+  <div class="box bearbeiten" id="frage-bearbeiten" hidden>
+    <textarea id="frage-feld" placeholder="Frage für die Wortwolke …"></textarea>
+    <button id="frage-speichern">Frage speichern</button>
+  </div>
+
+  <div class="box eingabe-box">
+    <div class="eingabe">
+      <input id="wort-feld" maxlength="40" placeholder="Dein Begriff …">
+      <button id="wort-senden">Senden</button>
+    </div>
+    <p class="hinweis" id="rest"></p>
+  </div>
+
+  <div id="wolke"></div>
+  <p id="anzahl"></p>
+</main>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1/+esm';
+
+// >>> Einstellungen <<<
+const MAX_BEGRIFFE = 0;   // Begriffe pro Person, 0 = unbegrenzt
+const WORTFARBEN = ['#a3195b', '#5b3fb5', '#1d5fa8', '#1f7a52', '#8a4b00', '#0f6e73', '#b3261e'];
+
+// >>> Hier deine beiden Werte aus Teil 3 eintragen <<<
+const supabase = createClient('https://oeqlvlrnflqfevktfyuz.supabase.co', 'sb_publishable_x7jDXG-iMW23TDVUm9HSEA_bDANHESG');
+
+const board = location.hash.slice(1) || 'wolke';
+const parameter = new URLSearchParams(location.search);
+const bearbeitenModus = parameter.has('bearbeiten');
+if (parameter.has('beamer')) document.body.classList.add('beamer');
+const $ = id => document.getElementById(id);
+const eintraege = new Map();   // Beitrags-Nummer -> Begriff
+let bekannt = new Set();       // schon angezeigte Begriffe
+let pin = null;
+
+// ---------- Hilfsfunktionen ----------
+function lesen(key) { try { return localStorage.getItem(key); } catch { return null; } }
+function schreiben(key, wert) { try { localStorage.setItem(key, wert); } catch {} }
+
+function zeigeFehler(text) {
+  $('fehler').textContent = 'Fehler: ' + text;
+  $('fehler').hidden = false;
+}
+
+function element(tag, klasse, text) {
+  const el = document.createElement(tag);
+  if (klasse) el.className = klasse;
+  if (text) el.textContent = text;
+  return el;
+}
+
+const aufraeumen = text => text.trim().replace(/\s+/g, ' ');
+const schluessel = text => aufraeumen(text).toLowerCase();
+
+// Jeder Begriff bekommt immer dieselbe Farbe
+function farbeVon(text) {
+  let h = 0;
+  for (const c of text) h = (h * 31 + c.codePointAt(0)) % 1000003;
+  return WORTFARBEN[h % WORTFARBEN.length];
+}
+
+// ---------- Begrenzung pro Person ----------
+const zaehlerKey = 'wolke-anzahl-' + board;
+const limit = bearbeitenModus ? 0 : MAX_BEGRIFFE;
+const gesendet = () => Number(lesen(zaehlerKey)) || 0;
+
+function zeigeRest() {
+  if (!limit) { $('rest').textContent = ''; return; }
+  const rest = Math.max(0, limit - gesendet());
+  $('rest').textContent = rest > 0
+    ? 'Du kannst noch ' + rest + (rest === 1 ? ' Begriff' : ' Begriffe') + ' eingeben.'
+    : 'Danke! Du hast alle deine Begriffe eingegeben.';
+  $('wort-feld').disabled = rest === 0;
+  $('wort-senden').disabled = rest === 0;
+}
+
+// ---------- Wolke zeichnen ----------
+function zeichne() {
+  const gruppen = new Map();
+  for (const text of eintraege.values()) {
+    const k = schluessel(text);
+    if (!k) continue;
+    const g = gruppen.get(k);
+    if (g) g.anzahl++;
+    else gruppen.set(k, { key: k, text: aufraeumen(text), anzahl: 1 });
+  }
+  const sortiert = [...gruppen.values()].sort((a, b) => b.anzahl - a.anzahl || a.key.localeCompare(b.key));
+  const max = sortiert.length ? sortiert[0].anzahl : 1;
+
+  // Die häufigsten Begriffe in die Mitte, die selteneren nach außen
+  const anordnung = [];
+  sortiert.forEach((g, i) => { if (i % 2 === 0) anordnung.push(g); else anordnung.unshift(g); });
+
+  const wolke = $('wolke');
+  wolke.replaceChildren();
+  if (!anordnung.length) wolke.append(element('span', 'leer-text', 'Noch keine Begriffe.'));
+  for (const g of anordnung) {
+    const span = element('span', 'wort', g.text);
+    const groesse = max > 1 ? 1 + 3.5 * (g.anzahl - 1) / (max - 1) : 1.6;
+    span.style.fontSize = groesse.toFixed(2) + 'rem';
+    span.style.color = farbeVon(g.key);
+    span.title = g.anzahl + '× genannt';
+    if (!bekannt.has(g.key)) span.classList.add('neu');
+    wolke.append(span);
+  }
+  bekannt = new Set(gruppen.keys());
+  $('anzahl').textContent = eintraege.size + (eintraege.size === 1 ? ' Beitrag' : ' Beiträge');
+}
+
+// ---------- Begriff senden ----------
+async function senden() {
+  const text = aufraeumen($('wort-feld').value);
+  if (!text) return;
+  if (limit && gesendet() >= limit) return;
+  $('wort-senden').disabled = true;
+  const { error } = await supabase.from('notes').insert({ board, kachel: 'wolke', text });
+  $('wort-senden').disabled = false;
+  if (error) { zeigeFehler(error.message); return; }
+  $('wort-feld').value = '';
+  schreiben(zaehlerKey, String(gesendet() + 1));
+  zeigeRest();
+  if (!$('wort-feld').disabled) $('wort-feld').focus();
+}
+$('wort-senden').addEventListener('click', senden);
+$('wort-feld').addEventListener('keydown', e => { if (e.key === 'Enter') senden(); });
+
+// ---------- Frage ----------
+function zeigeFrage(text) {
+  const t = (text || '').trim();
+  $('frage').textContent = t || 'Noch keine Frage eingetragen.';
+  $('frage').classList.toggle('leer', !t);
+  if (bearbeitenModus && document.activeElement !== $('frage-feld')) $('frage-feld').value = text || '';
+}
+
+if (bearbeitenModus) {
+  $('frage-bearbeiten').hidden = false;
+  $('frage-speichern').addEventListener('click', async () => {
+    if (!pin) pin = prompt('login eingeben:');
+    if (!pin) return;
+    const { error } = await supabase.rpc('fall_speichern',
+      { p_board: board, p_fall: 'frage', p_text: $('frage-feld').value, p_pin: pin });
+    if (error) { pin = null; zeigeFehler(error.message); }
+    else {
+      $('frage-speichern').textContent = 'Gespeichert ✓';
+      setTimeout(() => { $('frage-speichern').textContent = 'Frage speichern'; }, 2000);
+    }
+  });
+}
+
+// ---------- Laden ----------
+zeigeRest();
+const [r1, r2] = await Promise.all([
+  supabase.from('notes').select('id, text').eq('board', board).eq('kachel', 'wolke'),
+  supabase.from('faelle').select('*').eq('board', board).eq('fall', 'frage'),
+]);
+for (const r of [r1, r2]) if (r.error) zeigeFehler(r.error.message);
+(r1.data || []).forEach(z => eintraege.set(z.id, z.text));
+if (r2.data && r2.data[0]) zeigeFrage(r2.data[0].beschreibung);
+zeichne();
+
+// ---------- Live-Aktualisierung ----------
+supabase.channel('wolke-' + board)
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notes', filter: 'board=eq.' + board },
+      p => { if (p.new.kachel === 'wolke') { eintraege.set(p.new.id, p.new.text); zeichne(); } })
+  .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'notes' },
+      p => { if (eintraege.delete(p.old.id)) zeichne(); })
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'faelle', filter: 'board=eq.' + board },
+      p => { if (p.new && p.new.fall === 'frage') zeigeFrage(p.new.beschreibung); })
+  .subscribe(status => {
+    if (status === 'SUBSCRIBED') $('status').textContent = bearbeitenModus
+      ? '● Live verbunden – Bearbeiten-Modus' : '● Live verbunden';
+    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') $('status').textContent = '○ Keine Live-Verbindung (siehe Teil 6)';
+  });
+</script>
+</body>
+</html>
