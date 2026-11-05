@@ -158,7 +158,7 @@ function element(tag, klasse, text) {
 }
 
 async function mitPin(aktion) {
-  if (!pin) pin = prompt('Bitte deinen PIN eingeben:');
+  if (!pin) pin = prompt('login:');
   if (!pin) return false;
   const { error } = await aktion(pin);
   if (error) { pin = null; zeigeFehler(error.message); return false; }
