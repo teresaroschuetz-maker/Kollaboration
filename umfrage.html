@@ -289,7 +289,7 @@ function zeichne() {
   for (const a of stimmen.values()) if (anzahl.has(a)) anzahl.set(a, anzahl.get(a) + 1);
   const gesamt = [...anzahl.values()].reduce((s, n) => s + n, 0);
 
-  const zeigen = bearbeitenModus || ergebnisseSichtbar;
+    const zeigen = bearbeitenModus || parameter.has('beamer') || ergebnisseSichtbar;
   $('balken').hidden = !zeigen;
   $('verborgen').hidden = zeigen;
   $('gesamt').textContent = '· ' + gesamt + (gesamt === 1 ? ' Stimme' : ' Stimmen')
