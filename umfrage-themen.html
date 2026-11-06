@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Umfrage mit mehreren Themen</title>
+<style>
+  /* >>> Farben: Moos <<< */
+  :root {
+    --hintergrund: #f1f5ea;
+    --flaeche:     #ffffff;
+    --text:        #1f2a14;
+    --leise:       #56634a;
+    --rahmen:      #d3dec4;
+    --akzent:      #4a6b1e;
+    --akzent-hell: #e1ebd2;
+    --richtig:     #1e7d3a;
+    --falsch:      #b3261e;
+  }
+  [hidden] { display: none !important; }
+
+  body { font-family: system-ui, sans-serif; margin: 0; background: var(--hintergrund); color: var(--text); }
+  main { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+  #status { font-size: .9rem; color: var(--leise); margin-bottom: .8rem; }
+  #fehler { background: #fbebeb; color: #a00; padding: .8rem; border-radius: 8px; margin-bottom: 1rem; }
+  .box { background: var(--flaeche); border: 1px solid var(--rahmen); border-radius: 14px;
+         padding: 1.2rem; margin-bottom: 1.5rem; }
+  .box h2 { margin: 0 0 1rem; font-size: 1.2rem; }
+  .steuerung { background: var(--akzent-hell); border: 2px solid var(--akzent); }
+  label { font-weight: 600; }
+  textarea { width: 100%; box-sizing: border-box; padding: .6rem; font: inherit;
+             border: 1px solid var(--rahmen); border-radius: 8px; background: #fff; }
+  textarea:focus { outline: 2px solid var(--akzent); outline-offset: 1px; }
+  .zeile { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-top: .8rem; }
+  button { padding: .55rem 1.1rem; font-size: 1rem; cursor: pointer; border-radius: 999px;
+           border: 1px solid var(--rahmen); background: var(--flaeche); color: var(--text); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.haupt { background: var(--akzent); border-color: var(--akzent); color: #fff; font-weight: 600; }
+  button.klein { padding: .25rem .65rem; font-size: .9rem; }
+  .hinweis { font-size: .9rem; color: var(--leise); margin: .7rem 0 0; }
+  .ungespeichert { color: #8a4b00; font-weight: 600; font-size: .9rem; margin: .8rem 0 0; }
+
+  /* Live-Steuerung */
+  .chips { display: flex; flex-wrap: wrap; gap: .4rem; }
+  .chip { padding: .35rem .85rem; font-size: .95rem; }
+  .chip.aktiv { background: var(--text); color: #fff; border-color: var(--text); }
+  #stand { font-weight: 600; margin: 0 0 .7rem; }
+
+  /* Anzeige für alle */
+  #fortschritt { display: inline-block; font-size: .85rem; font-weight: 600; background: var(--akzent); color: #fff;
+                 border-radius: 999px; padding: .2rem .8rem; margin: 0 0 .6rem; }
+  #frage { font-size: 1.8rem; margin: .2rem 0 1.2rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .warten { font-size: 1.3rem; color: var(--leise); text-align: center; padding: 3rem 1rem; }
+  .bilder { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .6rem; margin: 0 0 1.5rem; }
+  .bilder:empty { display: none; }
+  .bild-box { position: relative; }
+  .bild-box img { width: 100%; max-height: 320px; object-fit: contain; background: #fff; display: block;
+                  border-radius: 10px; border: 1px solid var(--rahmen); cursor: zoom-in; }
+  .bild-box .weg { position: absolute; top: 6px; right: 6px; padding: .1rem .55rem; font-size: .85rem;
+                   background: var(--falsch); border-color: var(--falsch); color: #fff; }
+
+  .option { display: flex; align-items: center; gap: .6rem; width: 100%; text-align: left; padding: .9rem 1.1rem;
+            margin-bottom: .6rem; font-size: 1.1rem; border: 2px solid var(--rahmen); border-radius: 12px; }
+  .option:hover:not(:disabled) { border-color: var(--akzent); }
+  .option:disabled { opacity: 1; cursor: default; }
+  .option .haken { width: 1.4rem; text-align: center; flex: none; }
+  .option.gewaehlt { background: var(--akzent); color: #fff; border-color: var(--akzent); font-weight: 600; }
+  .option.richtig { border-color: var(--richtig); box-shadow: inset 0 0 0 1px var(--richtig); }
+  .option.ampel { font-weight: 600; }
+  .option.ampel.gewaehlt { color: #fff; }
+  .rueckmeldung { font-weight: 600; margin: .4rem 0 0; }
+  .rueckmeldung.gut { color: var(--richtig); }
+  .rueckmeldung.schlecht { color: var(--falsch); }
+
+  #gesamt { font-weight: 400; color: var(--leise); font-size: 1rem; }
+  .balken-zeile { margin-bottom: 1rem; }
+  .balken-kopf { display: flex; justify-content: space-between; gap: 1rem; margin-bottom: .3rem; }
+  .balken-wert { color: var(--leise); white-space: nowrap; }
+  .balken-spur { background: var(--akzent-hell); border-radius: 999px; height: 1.4rem; overflow: hidden; }
+  .balken-fuellung { background: var(--akzent); height: 100%; width: 0; border-radius: 999px; transition: width .6s ease; }
+  .marke-richtig { color: var(--richtig); font-weight: 700; white-space: nowrap; }
+  .option .marke-richtig { margin-left: auto; }
+  .option.gewaehlt .marke-richtig { color: #fff; }
+
+  /* Fragen vorbereiten */
+  .karte { background: #fff; border: 1px solid var(--rahmen); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
+  .karte.ziel { outline: 3px dashed var(--akzent); outline-offset: 2px; }
+  .karte-kopf { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: .7rem; }
+  .karte-kopf .nummer { font-weight: 700; margin-right: auto; }
+  .wahl { display: inline-flex; border: 1px solid var(--rahmen); border-radius: 999px; overflow: hidden; flex-wrap: wrap; }
+  .wahl button { border: none; border-radius: 0; padding: .35rem .8rem; font-size: .92rem; background: #fff; }
+  .wahl button + button { border-left: 1px solid var(--rahmen); }
+  .wahl button.an { background: var(--akzent); color: #fff; }
+  .unterzeile { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin: .8rem 0 0; }
+  .unterzeile .titel { font-size: .9rem; color: var(--leise); }
+  .haken-zeile { display: flex; align-items: center; gap: .45rem; font-weight: 400; margin: .4rem 0 0; }
+  .richtig-liste { margin: .6rem 0 0; padding: .6rem .8rem; background: #f6f9f1; border-radius: 8px; }
+  .richtig-liste .haken-zeile { margin: .3rem 0 0; }
+  .bild-zeile .bilder { margin: .6rem 0 0; grid-template-columns: repeat(auto-fill, minmax(140px, 200px)); }
+  .bild-zeile .bild-box img { max-height: 140px; }
+
+  #gross { position: fixed; inset: 0; background: rgba(15,25,5,.85); display: flex; align-items: center;
+           justify-content: center; padding: 1.5rem; z-index: 20; cursor: zoom-out; }
+  #gross img { max-width: 100%; max-height: 100%; border-radius: 8px; background: #fff; }
+
+  body.beamer main { max-width: 1200px; }
+  body.beamer #frage { font-size: 2.4rem; }
+  body.beamer .bilder img { max-height: 50vh; }
+  body.beamer .balken-kopf, body.beamer .option { font-size: 1.4rem; }
+  body.beamer .balken-spur { height: 2.2rem; }
+</style>
+</head>
+<body>
+<main>
+  <div id="status">Verbinde …</div>
+  <div id="fehler" hidden></div>
+
+  <!-- Nur in der Bearbeiten-Ansicht: Live-Steuerung -->
+  <div class="box steuerung" id="steuerung" hidden>
+    <h2>Live-Steuerung</h2>
+    <p id="stand"></p>
+    <div class="chips" id="chips"></div>
+    <div class="zeile">
+      <button id="zurueck">◀ Vorherige</button>
+      <button id="weiter" class="haupt">Nächste Frage ▶</button>
+      <button id="pause">⏸ Pause</button>
+    </div>
+    <div class="zeile">
+      <button id="sicht-knopf"></button>
+      <button id="loesung-knopf"></button>
+      <button id="zuruecksetzen">Stimmen dieser Frage zurücksetzen</button>
+      <button id="beamer-knopf">Beamer-Ansicht öffnen</button>
+    </div>
+    <p class="hinweis">Die Studierenden sehen immer nur die Frage, die du hier zeigst. Bei „Pause“ sehen sie „Bitte kurz warten“.</p>
+  </div>
+
+  <!-- Für alle: die aktuelle Frage -->
+  <div id="anzeige">
+    <p class="warten" id="warten">Bitte kurz warten – die nächste Frage erscheint gleich.</p>
+    <div id="live" hidden>
+      <span id="fortschritt"></span>
+      <h1 id="frage"></h1>
+      <div class="bilder" id="bilder"></div>
+      <div class="box" id="abstimmen">
+        <p class="hinweis" id="mehrfach" style="margin:0 0 .8rem">Mehrere Antworten sind richtig. Wähle alle passenden aus.</p>
+        <div id="auswahl"></div>
+        <p class="hinweis" id="meine"></p>
+        <p class="rueckmeldung" id="rueckmeldung" hidden></p>
+      </div>
+      <div class="box" id="ergebnis">
+        <h2>Ergebnis <span id="gesamt"></span></h2>
+        <p class="hinweis" id="verborgen" hidden>Die Ergebnisse werden gleich gezeigt.</p>
+        <div id="balken"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nur in der Bearbeiten-Ansicht: Fragen vorbereiten -->
+  <div class="box steuerung" id="editor" hidden>
+    <h2>Fragen vorbereiten</h2>
+    <div id="karten"></div>
+    <div class="zeile">
+      <button id="neue-umfrage">+ Umfrage</button>
+      <button id="neues-quiz">+ Quizfrage</button>
+    </div>
+    <p class="ungespeichert" id="ungespeichert" hidden>● Noch nicht gespeichert</p>
+    <div class="zeile"><button id="speichern" class="haupt">Alle Fragen speichern</button></div>
+    <p class="hinweis">Bilder: kopieren und im Fragefeld mit Cmd+V einfügen, auf die Frage ziehen oder auswählen. Höchstens 4 Bilder pro Frage.
+      Wenn du Antworten umbenennst oder umstellst, setze die Stimmen dieser Frage am besten zurück.</p>
+  </div>
+</main>
+<div id="gross" hidden><img alt="Bild in groß"></div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1/+esm';
+
+// >>> Bilder: höchstens so viele pro Frage, und so groß (in Pixeln) werden sie gespeichert <<<
+const MAX_BILDER = 4;
+const MAX_BILD_PIXEL = 1400;
+// >>> Höchstzahl der Fragen und der eigenen Antwortmöglichkeiten <<<
+const MAX_FRAGEN = 30;
+const MAX_OPTIONEN = 10;
+
+// >>> Hier deine beiden Werte aus Teil 3 eintragen <<<
+const supabase = createClient('https://oeqlvlrnflqfevktfyuz.supabase.co', 'sb_publishable_x7jDXG-iMW23TDVUm9HSEA_bDANHESG');
+
+const board = location.hash.slice(1) || 'umfrage-themen';
+const parameter = new URLSearchParams(location.search);
+const bearbeitenModus = parameter.has('bearbeiten');
+const beamerModus = parameter.has('beamer');
+if (beamerModus) document.body.classList.add('beamer');
+const $ = id => document.getElementById(id);
+
+// Feste Antwortmöglichkeiten
+const AMPEL = [
+  { id: 'rot', text: 'Rot', symbol: '🔴', farbe: '#c62828' },
+  { id: 'orange', text: 'Orange', symbol: '🟠', farbe: '#e67700' },
+  { id: 'gruen', text: 'Grün', symbol: '🟢', farbe: '#2e7d32' },
+];
+const JA_NEIN = [
+  { id: 'ja', text: 'Ja', symbol: '👍' },
+  { id: 'nein', text: 'Nein', symbol: '👎' },
+];
+const WEISS_NICHT = { id: 'weissnicht', text: 'Kann ich nicht sagen', symbol: '🤷' };
+
+let themen = [];          // gespeicherte Fragen
+let entwurf = [];         // Fragen in deiner Vorbereitung
+let bilderVon = {};       // gespeicherte Bilder pro Frage
+let geaendert = false;
+let live = { aktiv: '', ergebnisse: true, loesung: false };
+const stimmen = new Map(); // Person -> Antwort (nur aktuelle Frage)
+let stimmenKanal = null;
+let geladeneFrage = null;
+let pin = null;
+
+// ---------- Hilfsfunktionen ----------
+function lesen(key) { try { return localStorage.getItem(key); } catch { return null; } }
+function schreiben(key, wert) { try { localStorage.setItem(key, wert); } catch {} }
+
+function zeigeFehler(text) {
+  $('fehler').textContent = 'Fehler: ' + text;
+  $('fehler').hidden = false;
+}
+
+function element(tag, klasse, text) {
+  const el = document.createElement(tag);
+  if (klasse) el.className = klasse;
+  if (text) el.textContent = text;
+  return el;
+}
+
+async function mitPin(aktion) {
+  if (!pin) pin = 'login';
+  if (!pin) return false;
+  const { error } = await aktion(pin);
+  if (error) { pin = null; zeigeFehler(error.message); return false; }
+  return true;
+}
+
+function speichereEintrag(fall, text) {
+  return mitPin(p => supabase.rpc('fall_speichern', { p_board: board, p_fall: fall, p_text: text, p_pin: p }));
+}
+
+let person = lesen('ideen-person');
+if (!person) {
+  person = Date.now().toString(36) + Math.random().toString(36).slice(2);
+  schreiben('ideen-person', person);
+}
+
+const neueId = () => 'q' + Date.now().toString(36).slice(-5) + Math.random().toString(36).slice(2, 5);
+const boardVon = id => board + '--' + id;
+
+function jsonLesen(text, ersatz) {
+  try { const w = JSON.parse(text || ''); return w ?? ersatz; } catch { return ersatz; }
+}
+
+function bilderLesen(text) {
+  const liste = jsonLesen(text, []);
+  return Array.isArray(liste) ? liste.filter(b => typeof b === 'string' && b.startsWith('data:image/')) : [];
+}
+
+// Antwortmöglichkeiten einer Frage
+function optionenVon(f) {
+  if (f.format === 'ampel') return AMPEL;
+  if (f.format === 'janein') return f.weissnicht ? [...JA_NEIN, WEISS_NICHT] : JA_NEIN;
+  return (f.eigene || []).map((text, i) => ({ id: 'o' + (i + 1), text }));
+}
+
+const istQuiz = f => f && f.typ === 'quiz';
+const richtigeVon = f => istQuiz(f) ? (f.richtig || []).filter(id => optionenVon(f).some(o => o.id === id)) : [];
+const mehrfachVon = f => richtigeVon(f).length > 1;
+
+// Antwort lesen: einzelne Antwort oder Liste bei Mehrfachauswahl
+function antwortListe(a) {
+  if (!a) return [];
+  if (a.startsWith('[')) { const l = jsonLesen(a, []); return Array.isArray(l) ? l : []; }
+  return [a];
+}
+
+$('gross').addEventListener('click', () => { $('gross').hidden = true; });
+function zeigeGross(src) {
+  $('gross').querySelector('img').src = src;
+  $('gross').hidden = false;
+}
+
+function bildVerkleinern(datei) {
+  return new Promise((fertig, fehler) => {
+    const url = URL.createObjectURL(datei);
+    const img = new Image();
+    img.onload = () => {
+      const faktor = Math.min(1, MAX_BILD_PIXEL / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * faktor);
+      c.height = Math.round(img.height * faktor);
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      fertig(c.toDataURL('image/jpeg', 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); fehler(new Error('Das Bild konnte nicht gelesen werden.')); };
+    img.src = url;
+  });
+}
+
+function bildKasten(src, entfernen) {
+  const kasten = element('div', 'bild-box');
+  const img = element('img');
+  img.src = src;
+  img.alt = 'Bild zur Frage';
+  img.addEventListener('click', () => zeigeGross(src));
+  kasten.append(img);
+  if (entfernen) {
+    const weg = element('button', 'weg', '✕');
+    weg.title = 'Bild entfernen';
+    weg.addEventListener('click', entfernen);
+    kasten.append(weg);
+  }
+  return kasten;
+}
+
+// ======================================================================
+// Anzeige der aktuellen Frage (für alle)
+// ======================================================================
+const aktuelleFrage = () => themen.find(f => f.id === live.aktiv) || null;
+
+function zeichneAnzeige() {
+  const f = aktuelleFrage();
+  $('warten').hidden = !!f;
+  $('live').hidden = !f;
+  if (bearbeitenModus) zeichneSteuerung();
+  if (!f) return;
+
+  const nr = themen.indexOf(f) + 1;
+  $('fortschritt').textContent = (istQuiz(f) ? 'Quiz' : 'Umfrage') + ' · Frage ' + nr + ' von ' + themen.length;
+  $('frage').textContent = f.text || '';
+  $('bilder').replaceChildren(...(bilderVon[f.id] || []).map(src => bildKasten(src)));
+
+  const optionen = optionenVon(f);
+  const richtige = richtigeVon(f);
+  const mehrfach = mehrfachVon(f);
+  const meine = antwortListe(stimmen.get(person));
+  const loesungZeigen = istQuiz(f) && live.loesung;
+  const lehrSicht = bearbeitenModus && !beamerModus;
+  const gesperrt = beamerModus || loesungZeigen;
+
+  // Antwortknöpfe
+  $('mehrfach').hidden = !mehrfach;
+  const auswahl = $('auswahl');
+  auswahl.replaceChildren();
+  if (!optionen.length) auswahl.append(element('p', 'hinweis', 'Noch keine Antwortmöglichkeiten.'));
+  for (const o of optionen) {
+    const gewaehlt = meine.includes(o.id) && !beamerModus;
+    const knopf = element('button', 'option' + (o.farbe ? ' ampel' : '') + (gewaehlt ? ' gewaehlt' : '')
+      + ((loesungZeigen || lehrSicht) && richtige.includes(o.id) ? ' richtig' : ''));
+    if (o.farbe) {
+      knopf.style.borderColor = o.farbe;
+      if (gewaehlt) knopf.style.background = o.farbe;
+    }
+    const haken = element('span', 'haken', mehrfach ? (gewaehlt ? '☑' : '☐') : (o.symbol || (gewaehlt ? '✓' : '')));
+    knopf.append(haken, element('span', '', o.text));
+    if ((loesungZeigen || lehrSicht) && richtige.includes(o.id)) knopf.append(element('span', 'marke-richtig', ' ✓ richtig'));
+    knopf.disabled = gesperrt;
+    knopf.addEventListener('click', () => abstimmen(f, o.id));
+    auswahl.append(knopf);
+  }
+
+  const meineTexte = optionen.filter(o => meine.includes(o.id)).map(o => o.text);
+  $('meine').textContent = beamerModus || !meineTexte.length ? ''
+    : 'Deine Antwort: ' + meineTexte.join(', ') + (gesperrt ? '' : ' – du kannst sie noch ändern.');
+
+  // Rückmeldung beim Quiz, sobald die Lösung gezeigt wird
+  const rm = $('rueckmeldung');
+  rm.hidden = !(loesungZeigen && !beamerModus && meineTexte.length);
+  if (!rm.hidden) {
+    const stimmt = meine.length === richtige.length && richtige.every(id => meine.includes(id));
+    rm.className = 'rueckmeldung ' + (stimmt ? 'gut' : 'schlecht');
+    rm.textContent = stimmt ? '✓ Richtig!'
+      : '✗ Leider nicht ganz. Richtig ist: ' + optionen.filter(o => richtige.includes(o.id)).map(o => o.text).join(', ');
+  }
+
+  // Ergebnis
+  const anzahl = new Map(optionen.map(o => [o.id, 0]));
+  let personen = 0;
+  for (const a of stimmen.values()) {
+    const liste = antwortListe(a).filter(id => anzahl.has(id));
+    if (liste.length) personen++;
+    for (const id of liste) anzahl.set(id, anzahl.get(id) + 1);
+  }
+  const zeigen = bearbeitenModus || live.ergebnisse;
+  $('balken').hidden = !zeigen;
+  $('verborgen').hidden = zeigen;
+  $('gesamt').textContent = '· ' + personen + (personen === 1 ? ' Person' : ' Personen')
+    + (bearbeitenModus && !live.ergebnisse ? ' (für Studierende verborgen)' : '');
+
+  const balken = $('balken');
+  balken.replaceChildren();
+  for (const o of optionen) {
+    const n = anzahl.get(o.id);
+    const prozent = personen ? Math.round(n / personen * 100) : 0;
+    const zeile = element('div', 'balken-zeile');
+    const kopf = element('div', 'balken-kopf');
+    const name = element('span', '', (o.symbol && o.farbe ? o.symbol + ' ' : '') + o.text);
+    if ((loesungZeigen || lehrSicht) && richtige.includes(o.id)) name.append(element('span', 'marke-richtig', ' ✓'));
+    kopf.append(name, element('span', 'balken-wert', n + (n === 1 ? ' Stimme' : ' Stimmen') + ' · ' + prozent + ' %'));
+    const spur = element('div', 'balken-spur');
+    const fuellung = element('div', 'balken-fuellung');
+    if (o.farbe) fuellung.style.background = o.farbe;
+    spur.append(fuellung);
+    zeile.append(kopf, spur);
+    balken.append(zeile);
+    requestAnimationFrame(() => { fuellung.style.width = prozent + '%'; });
+  }
+}
+
+// ---------- Abstimmen ----------
+async function abstimmen(f, id) {
+  const vorher = stimmen.get(person);
+  let antwort;
+  if (mehrfachVon(f)) {
+    const liste = antwortListe(vorher);
+    const neu = liste.includes(id) ? liste.filter(x => x !== id) : [...liste, id];
+    antwort = JSON.stringify(neu.sort());
+  } else {
+    if (vorher === id) return;
+    antwort = id;
+  }
+  stimmen.set(person, antwort);
+  zeichneAnzeige();
+  const { error } = await supabase.from('stimmen').upsert(
+    { board: boardVon(f.id), person, antwort, updated_at: new Date().toISOString() },
+    { onConflict: 'board,person' });
+  if (error) {
+    if (vorher) stimmen.set(person, vorher); else stimmen.delete(person);
+    zeichneAnzeige();
+    zeigeFehler(error.message);
+  }
+}
+
+// ---------- Stimmen der aktuellen Frage laden und live verfolgen ----------
+async function stimmenLaden() {
+  const f = aktuelleFrage();
+  const id = f ? f.id : null;
+  if (id === geladeneFrage) return;
+  geladeneFrage = id;
+  stimmen.clear();
+  if (stimmenKanal) { supabase.removeChannel(stimmenKanal); stimmenKanal = null; }
+  if (!id) return;
+  const fb = boardVon(id);
+  const { data, error } = await supabase.from('stimmen').select('person, antwort').eq('board', fb);
+  if (geladeneFrage !== id) return;
+  if (error) zeigeFehler(error.message);
+  (data || []).forEach(s => stimmen.set(s.person, s.antwort));
+  zeichneAnzeige();
+  stimmenKanal = supabase.channel('themen-stimmen-' + fb)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'stimmen', filter: 'board=eq.' + fb },
+        p => { stimmen.set(p.new.person, p.new.antwort); zeichneAnzeige(); })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'stimmen', filter: 'board=eq.' + fb },
+        p => { stimmen.set(p.new.person, p.new.antwort); zeichneAnzeige(); })
+    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'stimmen' },
+        p => { if (p.old.board === fb) { stimmen.delete(p.old.person); zeichneAnzeige(); } })
+    .subscribe();
+}
+
+// ---------- Gespeicherte Einstellungen verarbeiten ----------
+function verarbeite(z) {
+  if (z.fall === 'themen') {
+    const liste = jsonLesen(z.beschreibung, []);
+    themen = Array.isArray(liste) ? liste : [];
+    if (bearbeitenModus && !geaendert) {
+      entwurf = themen.map(f => ({ ...f, bilder: [...(bilderVon[f.id] || [])] }));
+      zeichneEditor();
+    }
+    stimmenLaden();
+    zeichneAnzeige();
+  } else if (z.fall === 'live') {
+    live = { aktiv: '', ergebnisse: true, loesung: false, ...jsonLesen(z.beschreibung, {}) };
+    stimmenLaden();
+    zeichneAnzeige();
+  } else if (z.fall.startsWith('bilder-')) {
+    const id = z.fall.slice(7);
+    bilderVon[id] = bilderLesen(z.beschreibung);
+    if (bearbeitenModus && !geaendert) {
+      const e = entwurf.find(f => f.id === id);
+      if (e) { e.bilder = [...bilderVon[id]]; zeichneEditor(); }
+    }
+    zeichneAnzeige();
+  }
+}
+
+// Bilder sind groß und werden nach einer Live-Meldung frisch geladen
+async function nachladen(fall) {
+  const { data, error } = await supabase.from('faelle').select('*')
+    .eq('board', board).eq('fall', fall).maybeSingle();
+  if (error) zeigeFehler(error.message);
+  else if (data) verarbeite(data);
+}
+
+// ======================================================================
+// Live-Steuerung (nur Bearbeiten-Ansicht)
+// ======================================================================
+async function liveSetzen(aenderung) {
+  const neu = { ...live, ...aenderung };
+  if (await speichereEintrag('live', JSON.stringify(neu))) {
+    live = neu;
+    stimmenLaden();
+    zeichneAnzeige();
+  }
+}
+
+function zeichneSteuerung() {
+  const f = aktuelleFrage();
+  const nr = f ? themen.indexOf(f) : -1;
+  $('stand').textContent = !themen.length ? 'Noch keine Fragen gespeichert. Lege sie unten an.'
+    : f ? 'Gezeigt wird Frage ' + (nr + 1) + ' von ' + themen.length + ' (' + (istQuiz(f) ? 'Quiz' : 'Umfrage') + ').'
+    : 'Pause – die Studierenden sehen gerade keine Frage.';
+  const chips = $('chips');
+  chips.replaceChildren();
+  themen.forEach((t, i) => {
+    const chip = element('button', 'chip' + (t.id === live.aktiv ? ' aktiv' : ''), (i + 1) + (istQuiz(t) ? ' · Quiz' : ''));
+    chip.title = t.text || 'Frage ' + (i + 1);
+    chip.addEventListener('click', () => liveSetzen({ aktiv: t.id, loesung: false }));
+    chips.append(chip);
+  });
+  $('zurueck').disabled = nr <= 0;
+  $('weiter').disabled = nr >= themen.length - 1;
+  $('weiter').textContent = nr < 0 ? 'Erste Frage zeigen ▶' : 'Nächste Frage ▶';
+  $('pause').disabled = !f;
+  $('sicht-knopf').textContent = live.ergebnisse ? 'Ergebnisse für Studierende verbergen' : 'Ergebnisse für Studierende zeigen';
+  $('loesung-knopf').hidden = !istQuiz(f);
+  $('loesung-knopf').textContent = live.loesung ? 'Lösung wieder ausblenden' : 'Lösung zeigen';
+  $('zuruecksetzen').disabled = !f;
+}
+
+if (bearbeitenModus) {
+  $('steuerung').hidden = beamerModus;
+  $('editor').hidden = beamerModus;
+
+  $('weiter').addEventListener('click', () => {
+    const nr = themen.findIndex(f => f.id === live.aktiv);
+    const naechste = themen[nr + 1];
+    if (naechste) liveSetzen({ aktiv: naechste.id, loesung: false });
+  });
+  $('zurueck').addEventListener('click', () => {
+    const nr = themen.findIndex(f => f.id === live.aktiv);
+    if (nr > 0) liveSetzen({ aktiv: themen[nr - 1].id, loesung: false });
+  });
+  $('pause').addEventListener('click', () => liveSetzen({ aktiv: '', loesung: false }));
+  $('sicht-knopf').addEventListener('click', () => liveSetzen({ ergebnisse: !live.ergebnisse }));
+  $('loesung-knopf').addEventListener('click', () => liveSetzen({ loesung: !live.loesung }));
+  $('zuruecksetzen').addEventListener('click', async () => {
+    const f = aktuelleFrage();
+    if (!f || !confirm('Alle Stimmen zu dieser Frage löschen?')) return;
+    if (await mitPin(p => supabase.rpc('stimmen_loeschen', { p_board: boardVon(f.id), p_pin: p }))) {
+      stimmen.clear();
+      zeichneAnzeige();
+    }
+  });
+  $('beamer-knopf').addEventListener('click', () => {
+    window.open(location.pathname + '?beamer#' + board, '_blank');
+  });
+}
+
+// ======================================================================
+// Fragen vorbereiten (nur Bearbeiten-Ansicht)
+// ======================================================================
+function markiereGeaendert() {
+  geaendert = true;
+  $('ungespeichert').hidden = false;
+}
+
+function wahlKnoepfe(werte, aktuell, beiWahl) {
+  const gruppe = element('div', 'wahl');
+  for (const [wert, text] of werte) {
+    const knopf = element('button', wert === aktuell ? 'an' : '', text);
+    knopf.type = 'button';
+    knopf.addEventListener('click', () => { if (wert !== aktuell) beiWahl(wert); });
+    gruppe.append(knopf);
+  }
+  return gruppe;
+}
+
+function hakenZeile(text, an, beiAenderung) {
+  const zeile = element('label', 'haken-zeile');
+  const kasten = element('input');
+  kasten.type = 'checkbox';
+  kasten.checked = an;
+  kasten.addEventListener('change', () => beiAenderung(kasten.checked));
+  zeile.append(kasten, text);
+  return zeile;
+}
+
+async function bilderHinzufuegen(f, dateien) {
+  for (const datei of dateien) {
+    if (f.bilder.length >= MAX_BILDER) { zeigeFehler('Höchstens ' + MAX_BILDER + ' Bilder pro Frage.'); break; }
+    try {
+      f.bilder.push(await bildVerkleinern(datei));
+      markiereGeaendert();
+    } catch (err) {
+      zeigeFehler(err.message);
+    }
+  }
+  zeichneEditor();
+}
+
+function zeichneRichtige(f, ziel) {
+  ziel.replaceChildren();
+  if (!istQuiz(f)) { ziel.hidden = true; return; }
+  ziel.hidden = false;
+  const optionen = optionenVon(f);
+  ziel.append(element('div', 'titel', 'Richtige Antwort(en) ankreuzen – bei mehreren richtigen können Studierende mehrere wählen:'));
+  if (!optionen.length) ziel.append(element('p', 'hinweis', 'Zuerst Antwortmöglichkeiten eintragen.'));
+  for (const o of optionen) {
+    ziel.append(hakenZeile((o.symbol && o.farbe ? o.symbol + ' ' : '') + o.text, (f.richtig || []).includes(o.id), an => {
+      f.richtig = (f.richtig || []).filter(id => id !== o.id);
+      if (an) f.richtig.push(o.id);
+      markiereGeaendert();
+    }));
+  }
+}
+
+function zeichneEditor() {
+  const ziel = $('karten');
+  ziel.replaceChildren();
+  if (!entwurf.length) ziel.append(element('p', 'hinweis', 'Noch keine Fragen. Leg unten eine Umfrage oder eine Quizfrage an.'));
+
+  entwurf.forEach((f, i) => {
+    const karte = element('div', 'karte');
+    const kopf = element('div', 'karte-kopf');
+    kopf.append(element('span', 'nummer', 'Frage ' + (i + 1)));
+    kopf.append(wahlKnoepfe([['umfrage', '📊 Umfrage'], ['quiz', '🎯 Quiz']], f.typ, wert => {
+      f.typ = wert; markiereGeaendert(); zeichneEditor();
+    }));
+    const hoch = element('button', 'klein', '↑');
+    hoch.title = 'Nach oben';
+    hoch.disabled = i === 0;
+    hoch.addEventListener('click', () => { [entwurf[i - 1], entwurf[i]] = [entwurf[i], entwurf[i - 1]]; markiereGeaendert(); zeichneEditor(); });
+    const runter = element('button', 'klein', '↓');
+    runter.title = 'Nach unten';
+    runter.disabled = i === entwurf.length - 1;
+    runter.addEventListener('click', () => { [entwurf[i + 1], entwurf[i]] = [entwurf[i], entwurf[i + 1]]; markiereGeaendert(); zeichneEditor(); });
+    const weg = element('button', 'klein', '✕ Löschen');
+    weg.addEventListener('click', () => {
+      if (!confirm('Frage ' + (i + 1) + ' löschen?')) return;
+      entwurf.splice(i, 1); markiereGeaendert(); zeichneEditor();
+    });
+    kopf.append(hoch, runter, weg);
+    karte.append(kopf);
+
+    // Fragetext
+    const text = element('textarea');
+    text.rows = 2;
+    text.maxLength = 1000;
+    text.placeholder = istQuiz(f) ? 'Quizfrage, z. B. Welche Aussagen treffen zu?' : 'Frage, z. B. Wie sicher fühlst du dich beim Thema …?';
+    text.value = f.text || '';
+    text.addEventListener('input', () => { f.text = text.value; markiereGeaendert(); });
+    karte.append(text);
+
+    // Bilder
+    const bildZeile = element('div', 'bild-zeile');
+    const vorschau = element('div', 'bilder');
+    vorschau.append(...f.bilder.map((src, b) => bildKasten(src, () => { f.bilder.splice(b, 1); markiereGeaendert(); zeichneEditor(); })));
+    const dateiwahl = element('input');
+    dateiwahl.type = 'file';
+    dateiwahl.accept = 'image/*';
+    dateiwahl.multiple = true;
+    dateiwahl.hidden = true;
+    dateiwahl.addEventListener('change', () => { bilderHinzufuegen(f, [...dateiwahl.files]); dateiwahl.value = ''; });
+    bildZeile.append(vorschau, dateiwahl);
+    karte.append(bildZeile);
+
+    karte.addEventListener('paste', e => {
+      const dateien = [...(e.clipboardData ? e.clipboardData.files : [])].filter(d => d.type.startsWith('image/'));
+      if (!dateien.length) return;
+      e.preventDefault();
+      bilderHinzufuegen(f, dateien);
+    });
+    karte.addEventListener('dragover', e => { e.preventDefault(); karte.classList.add('ziel'); });
+    karte.addEventListener('dragleave', () => karte.classList.remove('ziel'));
+    karte.addEventListener('drop', e => {
+      karte.classList.remove('ziel');
+      const dateien = [...e.dataTransfer.files].filter(d => d.type.startsWith('image/'));
+      if (!dateien.length) return;
+      e.preventDefault();
+      bilderHinzufuegen(f, dateien);
+    });
+
+    // Art der Antworten
+    const formatZeile = element('div', 'unterzeile');
+    formatZeile.append(element('span', 'titel', 'Antworten:'));
+    formatZeile.append(wahlKnoepfe([['ampel', '🚦 Ampel'], ['janein', '👍 Ja / Nein'], ['eigene', '✏️ Eigene']], f.format, wert => {
+      f.format = wert; f.richtig = []; markiereGeaendert(); zeichneEditor();
+    }));
+    const bildKnopf = element('button', 'klein', '🖼 Bild auswählen');
+    bildKnopf.addEventListener('click', () => dateiwahl.click());
+    formatZeile.append(bildKnopf);
+    karte.append(formatZeile);
+
+    const richtigBox = element('div', 'richtig-liste');
+
+    if (f.format === 'janein') {
+      karte.append(hakenZeile('„Kann ich nicht sagen“ als dritte Antwort anbieten', !!f.weissnicht, an => {
+        f.weissnicht = an;
+        if (!an) f.richtig = (f.richtig || []).filter(id => id !== 'weissnicht');
+        markiereGeaendert();
+        zeichneRichtige(f, richtigBox);
+      }));
+    } else if (f.format === 'eigene') {
+      const optionen = element('textarea');
+      optionen.rows = 4;
+      optionen.style.marginTop = '.6rem';
+      optionen.placeholder = 'Eine Antwortmöglichkeit pro Zeile (höchstens ' + MAX_OPTIONEN + ')';
+      optionen.value = (f.eigene || []).join('\n');
+      optionen.addEventListener('input', () => {
+        f.eigene = optionen.value.split('\n').map(s => s.trim()).filter(Boolean).slice(0, MAX_OPTIONEN);
+        f.richtig = (f.richtig || []).filter(id => optionenVon(f).some(o => o.id === id));
+        markiereGeaendert();
+        zeichneRichtige(f, richtigBox);
+      });
+      karte.append(optionen);
+    } else {
+      karte.append(element('p', 'hinweis', 'Antworten: 🔴 Rot · 🟠 Orange · 🟢 Grün'));
+    }
+
+    zeichneRichtige(f, richtigBox);
+    karte.append(richtigBox);
+    ziel.append(karte);
+  });
+
+  $('neue-umfrage').disabled = $('neues-quiz').disabled = entwurf.length >= MAX_FRAGEN;
+}
+
+function neueFrage(typ) {
+  entwurf.push({ id: neueId(), typ, format: typ === 'quiz' ? 'eigene' : 'ampel', weissnicht: false,
+                 eigene: [], richtig: [], text: '', bilder: [] });
+  markiereGeaendert();
+  zeichneEditor();
+  const karten = $('karten').querySelectorAll('.karte');
+  const letzte = karten[karten.length - 1];
+  if (letzte) { letzte.scrollIntoView({ behavior: 'smooth', block: 'center' }); letzte.querySelector('textarea').focus(); }
+}
+
+async function allesSpeichern() {
+  // Prüfen, ob jede Quizfrage eine richtige Antwort hat
+  const ohneLoesung = entwurf.findIndex(f => istQuiz(f) && !richtigeVon(f).length);
+  if (ohneLoesung >= 0 && !confirm('Bei Frage ' + (ohneLoesung + 1) + ' ist noch keine richtige Antwort angekreuzt. Trotzdem speichern?')) return;
+
+  const knopf = $('speichern');
+  knopf.disabled = true;
+  const liste = entwurf.map(({ bilder, ...rest }) => ({ ...rest, text: (rest.text || '').trim() }));
+  let ok = true;
+  for (const f of entwurf) {
+    const neu = JSON.stringify(f.bilder);
+    if (neu !== JSON.stringify(bilderVon[f.id] || [])) {
+      ok = await speichereEintrag('bilder-' + f.id, neu);
+      if (!ok) break;
+      bilderVon[f.id] = [...f.bilder];
+    }
+  }
+  if (ok) ok = await speichereEintrag('themen', JSON.stringify(liste));
+  // Wird die gezeigte Frage gelöscht, geht es in die Pause
+  if (ok && live.aktiv && !liste.some(f => f.id === live.aktiv)) await liveSetzen({ aktiv: '', loesung: false });
+  knopf.disabled = false;
+  if (ok) {
+    geaendert = false;
+    $('ungespeichert').hidden = true;
+    themen = liste;
+    stimmenLaden();
+    zeichneAnzeige();
+    knopf.textContent = 'Gespeichert ✓';
+    setTimeout(() => { knopf.textContent = 'Alle Fragen speichern'; }, 2000);
+  }
+}
+
+if (bearbeitenModus && !beamerModus) {
+  $('neue-umfrage').addEventListener('click', () => neueFrage('umfrage'));
+  $('neues-quiz').addEventListener('click', () => neueFrage('quiz'));
+  $('speichern').addEventListener('click', allesSpeichern);
+  window.addEventListener('beforeunload', e => { if (geaendert) { e.preventDefault(); e.returnValue = ''; } });
+}
+
+// ======================================================================
+// Laden und Live-Aktualisierung
+// ======================================================================
+const { data, error } = await supabase.from('faelle').select('*').eq('board', board);
+if (error) zeigeFehler(error.message);
+const zeilen = data || [];
+// Erst Bilder, dann Fragen, dann den Live-Stand verarbeiten
+zeilen.filter(z => z.fall.startsWith('bilder-')).forEach(verarbeite);
+zeilen.filter(z => z.fall === 'themen').forEach(verarbeite);
+zeilen.filter(z => z.fall === 'live').forEach(verarbeite);
+if (bearbeitenModus && !zeilen.some(z => z.fall === 'themen')) zeichneEditor();
+zeichneAnzeige();
+
+supabase.channel('themen-' + board)
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'faelle', filter: 'board=eq.' + board },
+      p => {
+        if (!p.new || !p.new.fall) return;
+        if (p.new.fall.startsWith('bilder-')) nachladen(p.new.fall);
+        else verarbeite(p.new);
+      })
+  .subscribe(status => {
+    if (status === 'SUBSCRIBED') $('status').textContent = bearbeitenModus && !beamerModus
+      ? '● Live verbunden – Bearbeiten-Modus' : '● Live verbunden';
+    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') $('status').textContent = '○ Keine Live-Verbindung (siehe Teil 6)';
+  });
+</script>
+
+<footer style="text-align:center; font: .85rem system-ui, sans-serif; padding: 1.5rem 1rem; color: #555;">
+  <a href="impressum.html" style="color: inherit;">Impressum</a> ·
+  <a href="datenschutz.html" style="color: inherit;">Datenschutz</a>
+</footer>
+</body>
+</html>
