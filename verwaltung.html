@@ -304,6 +304,9 @@ knoepfe.append(bearbeiten);
 const kopie = element('button', '', 'Link für Studierende kopieren');
 kopie.addEventListener('click', () => kopieren(linkFuer(t, e.code, false), kopie));
 knoepfe.append(kopie);
+const duplizieren = element('button', '', 'Kopieren');
+duplizieren.addEventListener('click', () => kopierFormular(karte, e, t));
+knoepfe.append(duplizieren);
 }
 
 const weg = element('button', '', 'Aus Liste entfernen');
