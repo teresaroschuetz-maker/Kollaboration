@@ -388,7 +388,7 @@ function zeichneAnzeige() {
     if (liste.length) personen++;
     for (const id of liste) anzahl.set(id, anzahl.get(id) + 1);
   }
-  const zeigen = bearbeitenModus || live.ergebnisse;
+  const zeigen = bearbeitenModus || beamerModus || live.ergebnisse;
   $('balken').hidden = !zeigen;
   $('verborgen').hidden = zeigen;
   $('gesamt').textContent = '· ' + personen + (personen === 1 ? ' Person' : ' Personen')
