@@ -224,7 +224,51 @@ setTimeout(() => { knopf.textContent = alt; }, 2000);
 prompt('Link kopieren:', text);
 }
 }
-
+// ---------- Sammlung kopieren ----------
+function kopierFormular(karte, e, t) {
+if (karte.querySelector('.kopieren')) return;
+const box = element('div', 'kopieren');
+const titel = element('input');
+titel.maxLength = 100;
+titel.value = 'Kopie von ' + (e.titel || e.code);
+const code = element('input');
+code.maxLength = 40;
+code.placeholder = 'Code (leer lassen = Zufallscode)';
+const haken = element('label', 'schalter');
+const mitInhalten = element('input');
+mitInhalten.type = 'checkbox';
+mitInhalten.checked = e.tool === 'tafel';
+haken.append(mitInhalten, ' Auch die Inhalte kopieren (Zettel, Ideen, Kommentare, Argumente, Whiteboard). '
++ 'Ohne Haken wird nur die Vorbereitung kopiert (Fragen, Fallbeschreibungen, Einstellungen, Bilder). '
++ 'Likes und Stimmen werden nie kopiert.');
+const los = element('button', 'haupt', 'Kopie erstellen und öffnen');
+const abbrechen = element('button', '', 'Abbrechen');
+const zeile = (...inhalt) => { const z = element('div', 'zeile'); z.append(...inhalt); return z; };
+box.append(element('strong', '', 'Kopie erstellen'), zeile(titel), zeile(code), haken, zeile(los, abbrechen));
+karte.append(box);
+titel.focus();
+titel.select();
+abbrechen.addEventListener('click', () => box.remove());
+los.addEventListener('click', async () => {
+// Den neuen Tab sofort öffnen, sonst blockiert Safari ihn
+const fenster = window.open('', '_blank');
+const neuerCode = eigenerCode(code.value) || zufallsCode();
+los.disabled = true;
+const { data, error } = await supabase.rpc('sammlung_kopieren', {
+p_id: e.id, p_code: neuerCode, p_titel: titel.value.trim(), p_mit_inhalten: mitInhalten.checked });
+los.disabled = false;
+if (error) {
+if (fenster) fenster.close();
+zeigeFehler(uebersetze(error.message));
+return;
+}
+$('fehler').hidden = true;
+neuId = data.id;
+const link = linkFuer(t, neuerCode, t.bearbeiten);
+if (fenster) fenster.location.href = link; else window.open(link, '_blank');
+ladeListe();
+});
+}
 // ---------- Liste laden und anzeigen ----------
 async function ladeListe() {
 const alle = istAdmin && $('alle-feld').checked;
