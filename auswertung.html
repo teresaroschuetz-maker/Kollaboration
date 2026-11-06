@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auswertung</title>
+<style>
+[hidden] { display: none !important; }
+/* >>> Farbdesign Auswertung: Grau-Blau wie die Verwaltung <<< */
+:root {
+--hintergrund: #eceff3; --flaeche: #ffffff; --text: #1f2933; --leise: #52606d;
+--rahmen: #d9dee5; --akzent: #3d5a80; --balken: #2a78d6; --gitter: #e4e8ee;
+}
+body { font-family: system-ui, sans-serif; margin: 0; background: var(--hintergrund); color: var(--text); }
+main { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+a.zurueck { color: var(--akzent); text-decoration: none; }
+h1 { margin: .8rem 0 .3rem; }
+.untertitel { color: var(--leise); margin: 0 0 1.5rem; }
+h2 { font-size: 1.15rem; margin: 0 0 .8rem; }
+.box { background: var(--flaeche); border-radius: 10px; padding: 1.2rem; box-shadow: 0 2px 6px rgba(0,0,0,.08);
+margin-bottom: 1.5rem; }
+#fehler { background: #fbebeb; color: #a00; padding: .8rem; border-radius: 6px; margin-bottom: 1rem; }
+.filter { display: flex; flex-wrap: wrap; gap: .6rem; align-items: end; margin-bottom: 1.5rem; }
+.filter label { display: flex; flex-direction: column; font-size: .85rem; color: var(--leise); gap: .2rem; }
+.filter input, .filter select { padding: .45rem; font-size: 1rem; border: 1px solid var(--rahmen); border-radius: 6px;
+background: #fff; color: var(--text); }
+.filter .haken { flex-direction: row; align-items: center; gap: .4rem; font-size: .95rem; color: var(--text); padding-bottom: .5rem; }
+button { padding: .5rem .9rem; font-size: 1rem; cursor: pointer; border-radius: 999px;
+border: 1px solid #bbb; background: #fff; color: var(--text); }
+button.haupt { background: var(--akzent); border-color: var(--akzent); color: #fff; }
+.kacheln { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+.kachel { background: var(--flaeche); border-radius: 10px; padding: 1rem; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+.kachel .zahl { font-size: 1.9rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.kachel .was { font-size: .9rem; color: var(--leise); }
+.zwei { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+@media (max-width: 800px) { .zwei { grid-template-columns: 1fr; } }
+.tabelle-huelle { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+th, td { padding: .45rem .6rem; border-bottom: 1px solid var(--gitter); text-align: right; white-space: nowrap; }
+th:first-child, td:first-child, th.links, td.links { text-align: left; }
+th { font-weight: 600; color: var(--leise); font-size: .85rem; }
+td { font-variant-numeric: tabular-nums; }
+tr.summe td { font-weight: 700; border-top: 2px solid var(--rahmen); }
+.hinweis { font-size: .88rem; color: var(--leise); margin: .6rem 0 0; }
+.leer { color: var(--leise); font-style: italic; }
+.speicher { margin-bottom: .9rem; }
+.speicher .beschriftung { display: flex; justify-content: space-between; font-size: .9rem; margin-bottom: .3rem; }
+.speicher .spur { height: 10px; background: var(--gitter); border-radius: 999px; overflow: hidden; }
+.speicher .fuellung { height: 100%; background: var(--balken); border-radius: 999px; }
+.speicher .fuellung.knapp { background: #c2410c; }
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+#stunden svg { max-width: 640px; }
+svg text { font: 11px system-ui, sans-serif; fill: var(--leise); }
+.balken rect.mark { fill: var(--balken); }
+.balken rect.mark:hover, .balken rect.mark:focus { fill: #1c5cab; outline: none; }
+.zelle-tag:hover, .zelle-tag:focus { fill: rgba(42,120,214,.10); outline: none; }
+.zelle:hover, .zelle:focus { stroke: var(--text); stroke-width: 1.5; outline: none; }
+#tipp { position: fixed; pointer-events: none; background: #1f2933; color: #fff; padding: .4rem .6rem;
+border-radius: 6px; font-size: .85rem; line-height: 1.35; z-index: 10; box-shadow: 0 4px 10px rgba(0,0,0,.2); }
+#tipp strong { font-size: 1rem; }
+.legende { display: flex; align-items: center; gap: .4rem; font-size: .8rem; color: var(--leise); margin-top: .5rem; }
+.legende span.k { width: 18px; height: 10px; border-radius: 2px; display: inline-block; }
+</style>
+</head>
+<body>
+<main>
+<a class="zurueck" href="verwaltung.html">← Zur Verwaltung</a>
+<h1>Auswertung</h1>
+<p class="untertitel">Nur Anzahlen, keine Inhalte. Sichtbar nur für die Administratorin.</p>
+<div id="fehler" hidden></div>
+
+<div id="bereich" hidden>
+<div class="filter">
+<label>Von <input type="date" id="von"></label>
+<label>Bis <input type="date" id="bis"></label>
+<label>Person <select id="person"><option value="">Alle Personen</option></select></label>
+<label class="haken"><input type="checkbox" id="ohne-mich"> Meine eigenen Sammlungen ausblenden</label>
+<button class="haupt" id="laden">Aktualisieren</button>
+<button id="csv">CSV herunterladen</button>
+</div>
+
+<div class="kacheln" id="kacheln"></div>
+
+<div class="box">
+<h2>Aktivität pro Tag</h2>
+<div id="tage"></div>
+<p class="hinweis">Gezählt werden neue Beiträge, Kommentare und Whiteboard-Elemente (ohne Likes und Stimmen).</p>
+</div>
+
+<div class="box">
+<h2>Nach Tool</h2>
+<div class="tabelle-huelle" id="nach-tool"></div>
+</div>
+<div class="box">
+<h2>Wochentag und Uhrzeit</h2>
+<div id="stunden"></div>
+</div>
+
+<div class="box">
+<h2>Nach Person</h2>
+<div class="tabelle-huelle" id="nach-person"></div>
+</div>
+
+<div class="box">
+<h2>Alle Sammlungen</h2>
+<div class="tabelle-huelle" id="sammlungen"></div>
+<p class="hinweis">„Geräte“ zählt die verschiedenen zufälligen Gerätekennungen bei Likes und Stimmen. Das ist eine grobe Schätzung der Teilnehmenden, keine Personenzahl.</p>
+</div>
+
+<div class="box">
+<h2>Speicher im kostenlosen Plan</h2>
+<div id="speicher"></div>
+<p class="hinweis">Bilder in Fallarbeit, Whiteboard und Umfrage liegen in der Datenbank, Pinnwand-Dateien im Dateispeicher.</p>
+</div>
+</div>
+</main>
+<div id="tipp" hidden></div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1/+esm';
+
+// >>> Hier deine beiden Werte aus Teil 3 eintragen <<<
+const supabase = createClient('https://oeqlvlrnflqfevktfyuz.supabase.co', 'sb_publishable_x7jDXG-iMW23TDVUm9HSEA_bDANHESG');
+
+// Namen der Tools (gleiche Kurznamen wie in verwaltung.html)
+const TOOL_NAMEN = {
+pinnwand: 'Pinnwand', fallarbeit: 'Fallarbeit', ideen: 'Ideensammlung', fragen: 'Ideen zu mehreren Fragen',
+schritte: 'Fragen Schritt für Schritt', wolke: 'Wortwolke', umfrage: 'Live-Umfrage',   themen: 'Umfrage mit mehreren Themen',
+abstimmung: 'Pro und Contra', baum: 'Argumentbaum', tafel: 'Whiteboard',
+};
+// Grenzen des kostenlosen Supabase-Plans
+const GRENZE_DATENBANK = 500 * 1024 * 1024;
+const GRENZE_DATEIEN = 1024 * 1024 * 1024;
+
+const $ = id => document.getElementById(id);
+const zahl = n => Number(n || 0).toLocaleString('de-AT');
+const toolName = t => TOOL_NAMEN[t] || t;
+const kurz = email => (email || '').split('@')[0];
+let daten = null;
+let ich = null;
+
+function zeigeFehler(text) {
+$('fehler').textContent = text;
+$('fehler').hidden = false;
+}
+
+function element(tag, klasse, text) {
+const el = document.createElement(tag);
+if (klasse) el.className = klasse;
+if (text !== undefined && text !== null) el.textContent = text;
+return el;
+}
+
+function svgEl(tag, attrs) {
+const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+for (const [k, v] of Object.entries(attrs || {})) el.setAttribute(k, v);
+return el;
+}
+
+// ---------- Tooltip ----------
+function tooltip(el, wert, text) {
+const zeigen = ev => {
+const t = $('tipp');
+t.replaceChildren(element('strong', '', wert), document.createElement('br'), document.createTextNode(text));
+t.hidden = false;
+const r = ev.clientX !== undefined && ev.type !== 'focus' ? { x: ev.clientX, y: ev.clientY }
+: (() => { const b = el.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top }; })();
+t.style.left = Math.min(r.x + 12, innerWidth - t.offsetWidth - 8) + 'px';
+t.style.top = (r.y - t.offsetHeight - 10) + 'px';
+};
+el.setAttribute('tabindex', '0');
+el.addEventListener('pointermove', zeigen);
+el.addEventListener('focus', zeigen);
+el.addEventListener('pointerleave', () => { $('tipp').hidden = true; });
+el.addEventListener('blur', () => { $('tipp').hidden = true; });
+}
+
+// ---------- Tabelle ----------
+function tabelle(ziel, kopf, zeilen, summe) {
+if (!zeilen.length) { ziel.replaceChildren(element('p', 'leer', 'Keine Daten im gewählten Zeitraum.')); return; }
+const t = element('table');
+const tr = element('tr');
+kopf.forEach((k, i) => { const th = element('th', i < (kopf.links || 1) ? 'links' : '', k); tr.append(th); });
+const thead = element('thead');
+thead.append(tr);
+t.append(thead);
+const tb = element('tbody');
+for (const z of [...zeilen, ...(summe ? [summe] : [])]) {
+const r = element('tr', z === summe ? 'summe' : '');
+z.forEach((w, i) => r.append(element('td', i < (kopf.links || 1) ? 'links' : '', typeof w === 'number' ? zahl(w) : w)));
+tb.append(r);
+}
+t.append(tb);
+ziel.replaceChildren(t);
+}
+
+// ---------- Gefilterte Sammlungen ----------
+function auswahl() {
+const person = $('person').value;
+const ohneMich = $('ohne-mich').checked;
+return daten.sammlungen.filter(s => (!person || s.person === person) && !(ohneMich && s.person === ich));
+}
+
+const summe = s => s.beitraege + s.kommentare + s.likes + s.stimmen + s.whiteboard;
+
+function zeichne() {
+const liste = auswahl();
+const ids = new Set(liste.map(s => s.id));
+const aktiv = liste.filter(s => summe(s) > 0);
+
+// Kennzahlen
+const kacheln = [
+[new Set(liste.map(s => s.person)).size, 'Personen mit Sammlungen'],
+[liste.length, 'Sammlungen'],
+[aktiv.length, 'davon genutzt'],
+[liste.reduce((a, s) => a + s.beitraege, 0), 'Beiträge'],
+[liste.reduce((a, s) => a + s.kommentare, 0), 'Kommentare und Argumente'],
+[liste.reduce((a, s) => a + s.likes + s.stimmen, 0), 'Likes und Stimmen'],
+[liste.reduce((a, s) => a + s.whiteboard, 0), 'Whiteboard-Elemente'],
+];
+$('kacheln').replaceChildren(...kacheln.map(([n, w]) => {
+const k = element('div', 'kachel');
+k.append(element('div', 'zahl', zahl(n)), element('div', 'was', w));
+return k;
+}));
+
+zeichneTage(daten.tage.filter(t => ids.has(t.sid)));
+zeichneStunden(ids);
+
+// Nach Tool
+const proTool = new Map();
+for (const s of liste) {
+const z = proTool.get(s.tool) || { n: 0, aktiv: 0, b: 0, k: 0, ls: 0, w: 0 };
+z.n++; if (summe(s) > 0) z.aktiv++;
+z.b += s.beitraege; z.k += s.kommentare; z.ls += s.likes + s.stimmen; z.w += s.whiteboard;
+proTool.set(s.tool, z);
+}
+const toolZeilen = [...proTool].sort((a, b) => b[1].n - a[1].n)
+.map(([t, z]) => [toolName(t), z.n, z.aktiv, z.b, z.k, z.ls, z.w]);
+tabelle($('nach-tool'), ['Tool', 'Sammlungen', 'genutzt', 'Beiträge', 'Komm.', 'Likes/Stimmen', 'Whiteb.'], toolZeilen);
+
+// Nach Person (auch Personen ohne Sammlung)
+const personZeilen = daten.personen
+.filter(p => (!$('person').value || p.person === $('person').value) && !($('ohne-mich').checked && p.person === ich))
+.map(p => {
+const eigene = liste.filter(s => s.person === p.person);
+const tools = new Set(eigene.map(s => s.tool));
+const letzte = eigene.map(s => s.letzte).filter(Boolean).sort().pop();
+return [kurz(p.person) + (p.admin ? ' (Admin)' : ''), eigene.length, tools.size,
+eigene.reduce((a, s) => a + summe(s), 0),
+p.letzte_anmeldung ? new Date(p.letzte_anmeldung).toLocaleDateString('de-AT') : '–',
+letzte ? new Date(letzte).toLocaleDateString('de-AT') : '–'];
+});
+const kopfP = ['Person', 'Sammlungen', 'Tools', 'Einträge gesamt', 'Letzte Anmeldung', 'Letzte Aktivität'];
+tabelle($('nach-person'), kopfP, personZeilen);
+
+// Alle Sammlungen
+const dateien = new Map(daten.dateien.map(d => [d.sid, d]));
+const zeilen = liste.map(s => [
+'#' + s.id, toolName(s.tool), kurz(s.person), new Date(s.erstellt).toLocaleDateString('de-AT'),
+s.beitraege, s.kommentare, s.likes, s.stimmen, s.whiteboard, s.geraete, dateien.get(s.id)?.anzahl || 0,
+s.letzte ? new Date(s.letzte).toLocaleDateString('de-AT') : '–']);
+const kopfS = ['Nr.', 'Tool', 'Person', 'Erstellt', 'Beitr.', 'Komm.', 'Likes', 'Stimmen', 'Whiteb.', 'Geräte', 'Dateien', 'Zuletzt'];
+kopfS.links = 4;
+const summen = ['Summe', '', '', '', ...[4, 5, 6, 7, 8].map(i => zeilen.reduce((a, z) => a + z[i], 0)), '',
+zeilen.reduce((a, z) => a + z[10], 0), ''];
+tabelle($('sammlungen'), kopfS, zeilen, summen);
+
+// Speicher
+const leiste = (titel, bytes, grenze) => {
+const box = element('div', 'speicher');
+const b = element('div', 'beschriftung');
+const anteil = bytes / grenze;
+b.append(element('span', '', titel), element('span', '',
+(bytes / 1024 / 1024).toLocaleString('de-AT', { maximumFractionDigits: 1 }) + ' MB von '
++ (grenze / 1024 / 1024).toLocaleString('de-AT') + ' MB (' + Math.round(anteil * 100) + ' %)'));
+const spur = element('div', 'spur');
+const f = element('div', 'fuellung' + (anteil > .8 ? ' knapp' : ''));
+f.style.width = Math.min(100, anteil * 100) + '%';
+spur.append(f);
+box.append(b, spur);
+return box;
+};
+const teile = [leiste('Datenbank', daten.datenbank_bytes, GRENZE_DATENBANK)];
+if (daten.dateien_bytes !== null) teile.push(leiste('Dateispeicher', daten.dateien_bytes, GRENZE_DATEIEN));
+else teile.push(element('p', 'hinweis', 'Der Dateispeicher konnte nicht gelesen werden. Schau im Supabase-Dashboard unter Storage nach.'));
+if (daten.nicht_zugeordnet > 0) teile.push(element('p', 'hinweis',
+zahl(daten.nicht_zugeordnet) + ' Einträge im Zeitraum gehören zu keiner Sammlung in der Liste (z. B. ältere Tests). Sie sind oben nicht mitgezählt.'));
+$('speicher').replaceChildren(...teile);
+}
+
+// ---------- Balken: Aktivität pro Tag ----------
+function zeichneTage(tage) {
+const proTag = new Map();
+for (const t of tage) proTag.set(t.tag, (proTag.get(t.tag) || 0) + t.anzahl);
+if (!proTag.size) { $('tage').replaceChildren(element('p', 'leer', 'Keine Aktivität im gewählten Zeitraum.')); return; }
+// lückenlose Tagesreihe vom ersten bis zum letzten Tag
+const sortiert = [...proTag.keys()].sort();
+const start = new Date($('von').value || sortiert[0]);
+const ende = new Date($('bis').value || sortiert[sortiert.length - 1]);
+const reihe = [];
+for (let d = new Date(start); d <= ende && reihe.length < 400; d.setUTCDate(d.getUTCDate() + 1)) {
+const k = d.toISOString().slice(0, 10);
+reihe.push([k, proTag.get(k) || 0]);
+}
+const B = Math.max(360, $('tage').clientWidth || 1000), H = 220, L = 36, U = 26, O = 10;
+const max = Math.max(...reihe.map(r => r[1]));
+const schritt = max <= 5 ? 1 : Math.ceil(max / 4 / 5) * 5;
+const oben = Math.ceil(max / schritt) * schritt;
+const breite = (B - L) / reihe.length;
+const svg = svgEl('svg', { viewBox: `0 0 ${B} ${H}`, class: 'balken', role: 'img',
+'aria-label': 'Aktivität pro Tag als Balkendiagramm' });
+for (let w = 0; w <= oben; w += schritt) {
+const y = O + (H - O - U) * (1 - w / oben);
+svg.append(svgEl('line', { x1: L, x2: B, y1: y, y2: y, stroke: 'var(--gitter)', 'stroke-width': 1 }));
+const t = svgEl('text', { x: L - 6, y: y + 4, 'text-anchor': 'end' }); t.textContent = zahl(w); svg.append(t);
+}
+const jedeN = Math.ceil(reihe.length / 10);
+reihe.forEach(([tag, n], i) => {
+const h = (H - O - U) * n / oben;
+const x = L + i * breite + Math.min(2, breite * .15);
+const w = Math.max(1, breite - Math.min(2, breite * .15) * 2);
+const datum = new Date(tag).toLocaleDateString('de-AT', { weekday: 'short', day: 'numeric', month: 'numeric', year: 'numeric' });
+if (n > 0) {
+const r = Math.min(4, w / 2, h);
+const y = H - U - h;
+const pfad = svgEl('path', { class: 'mark-pfad',
+d: `M${x},${H - U} V${y + r} Q${x},${y} ${x + r},${y} H${x + w - r} Q${x + w},${y} ${x + w},${y + r} V${H - U} Z`,
+fill: 'var(--balken)' });
+svg.append(pfad);
+}
+// Trefferfläche über die ganze Höhe
+const treffer = svgEl('rect', { x: L + i * breite, y: O, width: breite, height: H - O - U, fill: 'transparent', class: 'zelle-tag' });
+tooltip(treffer, zahl(n) + ' Einträge', datum);
+svg.append(treffer);
+if (i % jedeN === 0) {
+const t = svgEl('text', { x: L + i * breite + breite / 2, y: H - 8, 'text-anchor': 'middle' });
+t.textContent = new Date(tag).toLocaleDateString('de-AT', { day: 'numeric', month: 'numeric' });
+svg.append(t);
+}
+});
+$('tage').replaceChildren(svg);
+}
+
+// ---------- Heatmap: Wochentag und Uhrzeit ----------
+// Die Datenbank liefert die Stunden über alle Sammlungen; für Filter nach Person wird neu geladen.
+const STUFEN = ['#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#256abf', '#184f95', '#0d366b'];
+function zeichneStunden() {
+const werte = daten.stunden;
+if (!werte.length) { $('stunden').replaceChildren(element('p', 'leer', 'Keine Aktivität im gewählten Zeitraum.')); return; }
+const tage = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+const feld = new Map(werte.map(w => [w.wochentag + '-' + w.stunde, w.anzahl]));
+const max = Math.max(...werte.map(w => w.anzahl));
+const Z = 18, G = 2, L = 26, O = 16;
+const svg = svgEl('svg', { viewBox: `0 0 ${L + 24 * Z} ${O + 7 * Z + 4}`, role: 'img',
+'aria-label': 'Aktivität nach Wochentag und Uhrzeit' });
+for (let s = 0; s < 24; s += 3) {
+const t = svgEl('text', { x: L + s * Z + Z / 2, y: 11, 'text-anchor': 'middle' }); t.textContent = s; svg.append(t);
+}
+tage.forEach((tagName, ti) => {
+const t = svgEl('text', { x: 0, y: O + ti * Z + Z / 2 + 4 }); t.textContent = tagName; svg.append(t);
+for (let s = 0; s < 24; s++) {
+const n = feld.get((ti + 1) + '-' + s) || 0;
+const stufe = n === 0 ? null : STUFEN[Math.min(STUFEN.length - 1, Math.floor((n / max) * (STUFEN.length - 1) + .0001))];
+const r = svgEl('rect', { x: L + s * Z + G / 2, y: O + ti * Z + G / 2, width: Z - G, height: Z - G, rx: 3,
+fill: stufe || 'var(--gitter)', class: 'zelle' });
+tooltip(r, zahl(n) + ' Einträge', tagName + ', ' + s + ':00–' + (s + 1) + ':00 Uhr');
+svg.append(r);
+}
+});
+const legende = element('div', 'legende');
+legende.append(element('span', '', 'wenig'));
+for (const f of STUFEN) { const k = element('span', 'k'); k.style.background = f; legende.append(k); }
+legende.append(element('span', '', 'viel (höchstens ' + zahl(max) + ' pro Stunde)'));
+const hinweis = element('p', 'hinweis', 'Alle Personen zusammen, inklusive Likes und Stimmen, Uhrzeit Wien.');
+$('stunden').replaceChildren(svg, legende, hinweis);
+}
+
+// ---------- CSV für die Auswertung in Excel oder SPSS ----------
+function csv() {
+const dateien = new Map(daten.dateien.map(d => [d.sid, d]));
+const kopf = ['sammlung_nr', 'tool', 'person', 'erstellt', 'beitraege', 'kommentare', 'likes', 'stimmen',
+'whiteboard', 'geraete', 'dateien', 'erste_aktivitaet', 'letzte_aktivitaet'];
+const zeilen = auswahl().map(s => [s.id, s.tool, kurz(s.person), s.erstellt, s.beitraege, s.kommentare, s.likes,
+s.stimmen, s.whiteboard, s.geraete, dateien.get(s.id)?.anzahl || 0, s.erste || '', s.letzte || '']);
+const ids = new Set(auswahl().map(s => s.id));
+const tage = [['tag', 'sammlung_nr', 'anzahl'], ...daten.tage.filter(t => ids.has(t.sid)).map(t => [t.tag, t.sid, t.anzahl])];
+const text = s => '"' + String(s).replace(/"/g, '""') + '"';
+const inhalt = [kopf, ...zeilen].map(z => z.map(text).join(';')).join('\n')
++ '\n\n' + tage.map(z => z.map(text).join(';')).join('\n');
+const blob = new Blob(['﻿' + inhalt], { type: 'text/csv;charset=utf-8' });
+const a = document.createElement('a');
+a.href = URL.createObjectURL(blob);
+a.download = 'auswertung-' + new Date().toISOString().slice(0, 10) + '.csv';
+a.click();
+setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// ---------- Laden ----------
+async function laden() {
+document.body.style.opacity = .7;
+const { data, error } = await supabase.rpc('auswertung', {
+p_von: $('von').value || null, p_bis: $('bis').value || null });
+document.body.style.opacity = 1;
+if (error) { zeigeFehler('Fehler: ' + error.message); return; }
+$('fehler').hidden = true;
+daten = data;
+const gewaehlt = $('person').value;
+$('person').replaceChildren(element('option', '', 'Alle Personen'));
+$('person').firstChild.value = '';
+for (const p of data.personen) {
+const o = element('option', '', kurz(p.person));
+o.value = p.person;
+$('person').append(o);
+}
+$('person').value = gewaehlt;
+$('bereich').hidden = false;
+zeichne();
+}
+
+$('laden').addEventListener('click', laden);
+$('person').addEventListener('change', () => daten && zeichne());
+$('ohne-mich').addEventListener('change', () => daten && zeichne());
+$('csv').addEventListener('click', () => daten && csv());
+
+// ---------- Start ----------
+const { data: { session } } = await supabase.auth.getSession();
+if (!session) {
+zeigeFehler('Bitte zuerst in der Verwaltung anmelden.');
+} else {
+ich = session.user.email;
+const { data: admin } = await supabase.rpc('ist_admin');
+if (admin !== true) zeigeFehler('Die Auswertung ist nur für die Administratorin sichtbar.');
+else laden();
+}
+</script>
+
+<footer style="text-align:center; font: .85rem system-ui, sans-serif; padding: 1.5rem 1rem; color: #555;">
+<a href="impressum.html" style="color: inherit;">Impressum</a> ·
+<a href="datenschutz.html" style="color: inherit;">Datenschutz</a>
+</footer>
+</body>
+</html>
