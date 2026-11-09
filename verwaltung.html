@@ -44,10 +44,15 @@ border-radius: 999px; margin-left: .3rem; vertical-align: middle; }
 .schalter { display: flex; align-items: center; gap: .5rem; margin: 0 0 1rem; font-size: .95rem; }
 .schalter input { flex: none; min-width: 0; width: 1.1rem; height: 1.1rem; }
 .liste-kopf { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-.kopieren { margin-top: .9rem; padding-top: .9rem; border-top: 1px solid #d9dee5; }
-.kopieren strong { display: block; margin-bottom: .5rem; }
-.kopieren .schalter { align-items: flex-start; margin: .2rem 0 .7rem; font-size: .9rem; }
-  
+.kopieren, .teilen { margin-top: .9rem; padding-top: .9rem; border-top: 1px solid #d9dee5; }
+.kopieren strong, .teilen strong { display: block; margin-bottom: .5rem; }
+.eintrag .geteilt { display: inline-block; font-size: .8rem; background: #dbe7f5; color: #1f3d63;
+padding: .1rem .5rem; border-radius: 999px; margin-bottom: .4rem; }
+.teilen .person { display: inline-flex; align-items: center; gap: .3rem; background: #eef2f7; border-radius: 999px;
+padding: .15rem .3rem .15rem .7rem; margin: 0 .3rem .3rem 0; font-size: .9rem; }
+.teilen .person button { padding: 0 .45rem; font-size: .85rem; }
+.kopieren .schalter, .teilen .schalter { align-items: flex-start; margin: .2rem 0 .7rem; font-size: .9rem; }
+
 /* >>> Farbdesign Verwaltung: Grau-Blau <<< */
 body { background: #eceff3; color: #1f2933; }
 a.zurueck { color: #3d5a80; }
@@ -160,7 +165,6 @@ const BENUTZER_ENDUNG = '@tools.test';
 // >>> Hier deine beiden Werte aus Teil 3 eintragen <<<
 const supabase = createClient('https://oeqlvlrnflqfevktfyuz.supabase.co', 'sb_publishable_x7jDXG-iMW23TDVUm9HSEA_bDANHESG');
 
-
 const $ = id => document.getElementById(id);
 const toolId = new URLSearchParams(location.search).get('tool');
 const tool = toolId ? TOOLS[toolId] : null;
@@ -226,6 +230,7 @@ setTimeout(() => { knopf.textContent = alt; }, 2000);
 prompt('Link kopieren:', text);
 }
 }
+
 // ---------- Sammlung kopieren ----------
 function kopierFormular(karte, e, t) {
 if (karte.querySelector('.kopieren')) return;
@@ -271,6 +276,74 @@ if (fenster) fenster.location.href = link; else window.open(link, '_blank');
 ladeListe();
 });
 }
+
+// ---------- Mit Kolleg*innen teilen ----------
+const kurzName = email => email && email.endsWith(BENUTZER_ENDUNG) ? email.slice(0, -BENUTZER_ENDUNG.length) : email;
+const vollName = name => { const n = name.trim().toLowerCase(); return n && !n.includes('@') ? n + BENUTZER_ENDUNG : n; };
+
+function teilenFormular(karte, e) {
+if (karte.querySelector('.teilen')) return;
+const box = element('div', 'teilen');
+box.append(element('strong', '', 'Teilen'));
+if (e.geteilt_mit) {
+const liste = element('div');
+liste.append(element('div', 'hinweis', 'Gemeinsam bearbeiten mit:'));
+for (const email of e.geteilt_mit.split(', ')) {
+const person = element('span', 'person', kurzName(email));
+const weg = element('button', '', '✕');
+weg.title = 'Nicht mehr teilen';
+weg.addEventListener('click', async () => {
+if (!confirm('„' + (e.titel || e.code) + '“ nicht mehr mit ' + kurzName(email) + ' teilen?')) return;
+const { error } = await supabase.rpc('sammlung_freigabe_beenden', { p_id: e.id, p_benutzer: email });
+if (error) zeigeFehler(uebersetze(error.message)); else ladeListe();
+});
+person.append(weg);
+liste.append(person);
+}
+box.append(liste);
+}
+const name = element('input');
+name.placeholder = 'Benutzername, z. B. kollegin2';
+name.autocomplete = 'off';
+const haken = element('label', 'schalter');
+const mitInhalten = element('input');
+mitInhalten.type = 'checkbox';
+haken.append(mitInhalten, ' Bei „Kopie schicken“ auch die Inhalte mitschicken (Zettel, Ideen, Kommentare, Whiteboard).');
+const gemeinsam = element('button', 'haupt', 'Gemeinsam bearbeiten');
+const kopie = element('button', '', 'Kopie schicken');
+const abbrechen = element('button', '', 'Abbrechen');
+const zeile = (...inhalt) => { const z = element('div', 'zeile'); z.append(...inhalt); return z; };
+box.append(zeile(name), haken, zeile(gemeinsam, kopie, abbrechen), element('p', 'hinweis',
+'Gemeinsam bearbeiten: Die Sammlung erscheint auch in ihrer Liste, ihr arbeitet beide am selben Link. '
++ 'Kopie schicken: Sie bekommt eine eigene Kopie mit eigenem Link und kann sie unabhängig von dir verändern.'));
+karte.append(box);
+name.focus();
+abbrechen.addEventListener('click', () => box.remove());
+
+gemeinsam.addEventListener('click', async () => {
+const wer = vollName(name.value);
+if (!wer) { name.focus(); return; }
+gemeinsam.disabled = true;
+const { error } = await supabase.rpc('sammlung_teilen', { p_id: e.id, p_benutzer: wer });
+gemeinsam.disabled = false;
+if (error) { zeigeFehler(uebersetze(error.message)); return; }
+zeigeMeldung('„' + (e.titel || e.code) + '“ ist jetzt mit ' + kurzName(wer) + ' geteilt.');
+ladeListe();
+});
+
+kopie.addEventListener('click', async () => {
+const wer = vollName(name.value);
+if (!wer) { name.focus(); return; }
+kopie.disabled = true;
+const { error } = await supabase.rpc('sammlung_kopie_schicken', { p_id: e.id, p_benutzer: wer,
+p_code: zufallsCode(), p_titel: e.titel || '', p_mit_inhalten: mitInhalten.checked });
+kopie.disabled = false;
+if (error) { zeigeFehler(uebersetze(error.message)); return; }
+zeigeMeldung('Eine Kopie von „' + (e.titel || e.code) + '“ liegt jetzt in der Liste von ' + kurzName(wer) + '.');
+box.remove();
+});
+}
+
 // ---------- Liste laden und anzeigen ----------
 async function ladeListe() {
 const alle = istAdmin && $('alle-feld').checked;
@@ -283,11 +356,13 @@ $('liste-titel').textContent = alle ? 'Sammlungen aller Personen' : 'Deine Samml
 for (const e of data) {
 const t = TOOLS[e.tool];
 const karte = element('div', 'eintrag' + (e.id === neuId ? ' neu' : ''));
-if (!e.meine) karte.append(element('div', 'fremd', 'Gehört: ' + e.besitzerin));
+if (e.geteilt && !e.meine) karte.append(element('div', 'geteilt', 'Geteilt von ' + kurzName(e.besitzerin)));
+else if (!e.meine) karte.append(element('div', 'fremd', 'Gehört: ' + e.besitzerin));
 karte.append(element('h3', '', e.titel || 'Ohne Titel'));
 const datum = new Date(e.created_at).toLocaleDateString('de-AT');
 let info = (toolId ? '' : (t ? t.name : 'Tool „' + e.tool + '“') + ' · ')
 + 'Code: ' + e.code + ' · erstellt am ' + datum;
+if (e.meine && e.geteilt_mit) info += '\nGemeinsam mit: ' + e.geteilt_mit.split(', ').map(kurzName).join(', ');
 if (t) info += '\nLink für Studierende: ' + linkFuer(t, e.code, false);
 karte.append(element('div', 'info', info));
 
@@ -306,9 +381,30 @@ knoepfe.append(bearbeiten);
 const kopie = element('button', '', 'Link für Studierende kopieren');
 kopie.addEventListener('click', () => kopieren(linkFuer(t, e.code, false), kopie));
 knoepfe.append(kopie);
+
 const duplizieren = element('button', '', 'Kopieren');
 duplizieren.addEventListener('click', () => kopierFormular(karte, e, t));
 knoepfe.append(duplizieren);
+}
+
+if (e.meine || (istAdmin && !e.geteilt)) {
+const teilen = element('button', '', 'Teilen');
+teilen.addEventListener('click', () => teilenFormular(karte, e));
+knoepfe.append(teilen);
+}
+
+if (e.geteilt && !e.meine) {
+const weg = element('button', '', 'Aus meiner Liste entfernen');
+weg.addEventListener('click', async () => {
+if (!confirm('„' + (e.titel || e.code) + '“ aus deiner Liste entfernen?\n\n'
++ 'Die Sammlung bleibt bei ' + kurzName(e.besitzerin) + ' erhalten. Du kannst sie danach nicht mehr bearbeiten.')) return;
+const { error } = await supabase.rpc('sammlung_freigabe_beenden', { p_id: e.id });
+if (error) zeigeFehler(uebersetze(error.message)); else ladeListe();
+});
+knoepfe.append(weg);
+karte.append(knoepfe);
+$('liste').append(karte);
+continue;
 }
 
 const weg = element('button', '', 'Aus Liste entfernen');
