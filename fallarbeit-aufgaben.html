@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fallarbeit mit Aufgaben</title>
+<style>
+  /* >>> Farben: Ozean <<< */
+  :root {
+    --hintergrund: #eaf3f6;
+    --flaeche:     #ffffff;
+    --text:        #102a35;
+    --leise:       #4b6672;
+    --rahmen:      #c6dde6;
+    --akzent:      #0e5a7a;
+    --akzent-hell: #d7eaf1;
+    --info:        #fff7dc;
+  }
+  [hidden] { display: none !important; }
+
+  body { font-family: system-ui, sans-serif; margin: 0; background: var(--hintergrund); color: var(--text); }
+  main { max-width: 920px; margin: 0 auto; padding: 2rem 1.5rem; }
+  #status { font-size: .9rem; color: var(--leise); margin-bottom: .8rem; }
+  #fehler { background: #fbebeb; color: #a00; padding: .8rem; border-radius: 8px; margin-bottom: 1rem; }
+  h1 { margin: .2rem 0 1rem; }
+  .box { background: var(--flaeche); border: 1px solid var(--rahmen); border-radius: 14px; padding: 1.2rem; margin-bottom: 1.5rem; }
+  .box h2 { margin: 0 0 .8rem; font-size: 1.2rem; }
+  .steuerung { background: var(--akzent-hell); border: 2px solid var(--akzent); }
+  textarea, input[type=text] { width: 100%; box-sizing: border-box; padding: .55rem; font: inherit;
+    border: 1px solid var(--rahmen); border-radius: 8px; background: #fff; color: var(--text); }
+  textarea:focus, input:focus { outline: 2px solid var(--akzent); outline-offset: 1px; }
+  input[type=number] { width: 4.5rem; padding: .4rem; font: inherit; border: 1px solid var(--rahmen); border-radius: 8px; }
+  .zeile { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-top: .8rem; }
+  button { padding: .55rem 1.1rem; font-size: 1rem; cursor: pointer; border-radius: 999px;
+           border: 1px solid var(--rahmen); background: var(--flaeche); color: var(--text); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.haupt { background: var(--akzent); border-color: var(--akzent); color: #fff; font-weight: 600; }
+  button.klein { padding: .25rem .65rem; font-size: .9rem; }
+  .hinweis { font-size: .9rem; color: var(--leise); margin: .6rem 0 0; }
+  .ungespeichert { color: #8a4b00; font-weight: 600; font-size: .9rem; margin: .8rem 0 0; }
+
+  /* Reiter für Lehrende */
+  .reiter { display: flex; gap: .4rem; margin: 0 0 1rem; flex-wrap: wrap; }
+  .reiter button.an { background: var(--text); color: #fff; border-color: var(--text); }
+
+  /* Gruppenwahl und Name */
+  .gruppen-wahl { display: flex; flex-wrap: wrap; gap: .6rem; }
+  .gruppen-wahl button { font-size: 1.1rem; padding: .8rem 1.4rem; border-radius: 12px; }
+  #wer-kopf { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; margin-bottom: 1.2rem; }
+  #wer-name { font-size: 1.2rem; font-weight: 700; }
+  #name-zeile { flex: 1; min-width: 220px; max-width: 360px; }
+  a.leise { color: var(--leise); font-size: .9rem; cursor: pointer; text-decoration: underline; }
+
+  /* Fälle und Aufgaben */
+  .fall { background: var(--flaeche); border-radius: 14px; border-top: 6px solid var(--akzent);
+          box-shadow: 0 2px 8px rgba(0,0,0,.08); padding: 1.2rem; margin-bottom: 1.8rem; }
+  .fall > h2 { margin: 0 0 .6rem; font-size: 1.35rem; }
+  .fall .beschreibung { white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: .8rem; }
+  .bilder { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .5rem; margin: .4rem 0 .8rem; }
+  .bilder:empty { display: none; }
+  .bild-box { position: relative; }
+  .bild-box img { width: 100%; max-height: 260px; object-fit: contain; background: #fff; display: block;
+                  border: 1px solid var(--rahmen); border-radius: 8px; cursor: zoom-in; }
+  .bild-box .weg { position: absolute; top: 4px; right: 4px; padding: .05rem .5rem; font-size: .85rem;
+                   background: #b3261e; border-color: #b3261e; color: #fff; }
+  .aufgabe { border-top: 1px solid var(--rahmen); padding: 1rem 0 .4rem; }
+  .aufgabe .frage { font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: .6rem; }
+  .aufgabe .frage .nr { color: var(--akzent); margin-right: .3rem; }
+  .aufgabe.info { background: var(--info); border: none; border-radius: 10px; padding: .9rem 1rem; margin: 1rem 0 .4rem; }
+  .aufgabe.info .frage { font-weight: 400; margin: 0; }
+  .option { display: flex; align-items: center; gap: .6rem; width: 100%; text-align: left; padding: .7rem 1rem;
+            margin-bottom: .45rem; font-size: 1rem; border: 2px solid var(--rahmen); border-radius: 10px; background: #fff; }
+  .option:hover { border-color: var(--akzent); }
+  .option.gewaehlt { background: var(--akzent); color: #fff; border-color: var(--akzent); font-weight: 600; }
+  .option .haken { width: 1.3rem; text-align: center; flex: none; }
+  .speicher-status { font-size: .85rem; color: var(--leise); min-height: 1.2em; margin-top: .3rem; }
+  .speicher-status.fehler { color: #b3261e; font-weight: 600; }
+  .bild-knopf-zeile { display: flex; gap: .5rem; align-items: center; margin-top: .4rem; flex-wrap: wrap; }
+
+  /* Antworten anzeigen */
+  .andere { margin-top: .8rem; background: #f4f9fb; border-radius: 10px; padding: .8rem; }
+  .andere h4 { margin: 0 0 .5rem; font-size: .95rem; color: var(--leise); }
+  .antwort-karte { background: #fff; border: 1px solid var(--rahmen); border-radius: 8px; padding: .6rem .8rem;
+                   margin-bottom: .45rem; position: relative; }
+  .antwort-karte .von { font-size: .8rem; font-weight: 700; color: var(--akzent); margin-bottom: .2rem; }
+  .antwort-karte .inhalt { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .antwort-karte .bilder { margin: .4rem 0 0; grid-template-columns: repeat(auto-fill, minmax(110px, 160px)); }
+  .antwort-karte .entf { position: absolute; top: .3rem; right: .3rem; padding: 0 .45rem; font-size: .85rem;
+                         background: transparent; border: none; color: #8a1c14; }
+  .balken-zeile { margin-bottom: .6rem; }
+  .balken-kopf { display: flex; justify-content: space-between; gap: 1rem; margin-bottom: .2rem; font-size: .95rem; }
+  .balken-wert { color: var(--leise); white-space: nowrap; }
+  .balken-spur { background: var(--akzent-hell); border-radius: 999px; height: 1rem; overflow: hidden; }
+  .balken-fuellung { background: var(--akzent); height: 100%; border-radius: 999px; transition: width .5s; }
+
+  /* Vorbereiten */
+  .einstellung { display: flex; flex-wrap: wrap; gap: .8rem 1.4rem; align-items: center; margin-top: .8rem; }
+  .einstellung label { display: flex; align-items: center; gap: .45rem; }
+  .wahl { display: inline-flex; border: 1px solid var(--rahmen); border-radius: 999px; overflow: hidden; flex-wrap: wrap; background: #fff; }
+  .wahl button { border: none; border-radius: 0; padding: .35rem .8rem; font-size: .92rem; background: #fff; }
+  .wahl button + button { border-left: 1px solid var(--rahmen); }
+  .wahl button.an { background: var(--akzent); color: #fff; }
+  .e-fall { background: #fff; border: 1px solid var(--rahmen); border-top: 5px solid var(--akzent); border-radius: 12px;
+            padding: 1rem; margin-top: 1.2rem; }
+  .e-kopf { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; margin-bottom: .6rem; }
+  .e-kopf .nummer { font-weight: 700; margin-right: auto; }
+  .e-aufgabe { background: #f6fafc; border: 1px solid var(--rahmen); border-radius: 10px; padding: .8rem; margin-top: .8rem; }
+  .e-aufgabe.ziel, .e-fall.ziel { outline: 3px dashed var(--akzent); outline-offset: 2px; }
+  .e-aufgabe textarea { margin-top: .5rem; }
+  .klein-titel { font-size: .85rem; font-weight: 600; color: var(--leise); margin: .6rem 0 .2rem; }
+  .haken-zeile { display: flex; align-items: center; gap: .45rem; margin-top: .4rem; font-size: .95rem; }
+
+  #gross { position: fixed; inset: 0; background: rgba(5,20,30,.85); display: flex; align-items: center;
+           justify-content: center; padding: 1.5rem; z-index: 20; cursor: zoom-out; }
+  #gross img { max-width: 100%; max-height: 100%; border-radius: 8px; background: #fff; }
+</style>
+</head>
+<body>
+<main>
+  <div id="status">Verbinde …</div>
+  <div id="fehler" hidden></div>
+  <h1 id="titel">Fallarbeit</h1>
+
+  <!-- Lehrende: Steuerung und Reiter -->
+  <div class="box steuerung" id="steuerung" hidden>
+    <div class="reiter">
+      <button id="reiter-antworten" class="an">📊 Antworten</button>
+      <button id="reiter-vorbereiten">📋 Fälle und Aufgaben vorbereiten</button>
+      <button id="reiter-vorschau">👀 Ansicht für Studierende</button>
+    </div>
+    <div class="zeile" style="margin-top:0">
+      <button id="freigabe-knopf"></button>
+      <button id="csv-knopf">⬇ Antworten als CSV</button>
+      <button id="alle-loeschen">Alle Antworten löschen</button>
+    </div>
+    <p class="hinweis" id="freigabe-hinweis"></p>
+  </div>
+
+  <!-- Studierende: Gruppe wählen -->
+  <div class="box" id="gruppe-waehlen" hidden>
+    <h2>Welche Gruppe seid ihr?</h2>
+    <div class="gruppen-wahl" id="gruppen-knoepfe"></div>
+  </div>
+
+  <!-- Studierende: Aufgaben bearbeiten / Lehrende: Antworten ansehen -->
+  <div id="wer-kopf" hidden>
+    <span id="wer-name"></span>
+    <a class="leise" id="gruppe-wechseln" hidden>Gruppe wechseln</a>
+    <div id="name-zeile" hidden><input type="text" id="name-feld" maxlength="80" placeholder="Dein Name (freiwillig)"></div>
+  </div>
+  <p class="hinweis" id="leer-hinweis" hidden>Hier gibt es noch keine Fälle.</p>
+  <div id="faelle"></div>
+
+  <!-- Lehrende: Vorbereiten -->
+  <div class="box steuerung" id="editor" hidden>
+    <h2>Fälle und Aufgaben vorbereiten</h2>
+    <div class="einstellung">
+      <span>Wer antwortet?</span><span id="modus-wahl"></span>
+    </div>
+    <div class="einstellung" id="gruppen-einstellung">
+      <label>Anzahl der Gruppen <input type="number" id="gruppen-feld" min="1" max="20"></label>
+    </div>
+    <div class="einstellung" id="namen-einstellung">
+      <label><input type="checkbox" id="namen-feld"> Nach dem Namen fragen (Angabe bleibt freiwillig)</label>
+    </div>
+    <div id="e-faelle"></div>
+    <div class="zeile"><button id="neuer-fall">+ Fall</button></div>
+    <p class="ungespeichert" id="ungespeichert" hidden>● Noch nicht gespeichert</p>
+    <div class="zeile"><button id="speichern" class="haupt">Alles speichern</button></div>
+    <p class="hinweis">Bilder: kopieren und im Textfeld mit Cmd+V einfügen, auf das Feld ziehen oder auswählen.
+      Wenn du Aufgaben löschst oder Antwortmöglichkeiten umstellst, passen bereits abgegebene Antworten eventuell nicht mehr dazu.</p>
+  </div>
+</main>
+<div id="gross" hidden><img alt="Bild in groß"></div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1/+esm';
+
+// >>> Bilder: höchstens so viele und so groß (in Pixeln) <<<
+const MAX_BILDER_FALL = 4;
+const MAX_BILDER_AUFGABE = 2;
+const MAX_BILDER_ANTWORT = 2;
+const MAX_BILD_PIXEL = 1200;
+const MAX_OPTIONEN = 10;
+
+// >>> Hier deine beiden Werte aus Teil 3 eintragen <<<
+const supabase = createClient('https://oeqlvlrnflqfevktfyuz.supabase.co', 'sb_publishable_x7jDXG-iMW23TDVUm9HSEA_bDANHESG');
+
+const board = location.hash.slice(1) || 'fallarbeit-aufgaben';
+const bearbeitenModus = new URLSearchParams(location.search).has('bearbeiten');
+const $ = id => document.getElementById(id);
+
+const TYPEN = [
+  ['text', '📝 Textfeld'],
+  ['kurz', '✏️ Kurze Antwort'],
+  ['mc', '☑️ Multiple Choice'],
+  ['info', 'ℹ️ Information'],
+];
+const LEER = { modus: 'gruppen', gruppen: 6, namen: true, faelle: [] };
+
+let aufbau = JSON.parse(JSON.stringify(LEER));
+let bilder = {};               // 'f-<fall>' und 'a-<aufgabe>' -> Liste von Bildern
+let entwurf = null;
+let entwurfBilder = {};
+let geaendert = false;
+let freigegeben = false;
+let ansicht = bearbeitenModus ? 'antworten' : 'studierende';   // antworten | vorbereiten | vorschau | studierende
+let alleAntworten = [];        // für Lehrende und nach der Freigabe
+const meine = new Map();       // Aufgabe -> { antwort, zeit }
+const felder = new Map();      // Aufgabe -> Eingabe auf der Seite
+let pin = null;
+
+// ---------- Hilfsfunktionen ----------
+function lesen(key) { try { return localStorage.getItem(key); } catch { return null; } }
+function schreiben(key, wert) { try { if (wert === null) localStorage.removeItem(key); else localStorage.setItem(key, wert); } catch {} }
+
+function zeigeFehler(text) {
+  $('fehler').textContent = 'Fehler: ' + text;
+  $('fehler').hidden = false;
+  clearTimeout(zeigeFehler.t);
+  zeigeFehler.t = setTimeout(() => { $('fehler').hidden = true; }, 7000);
+}
+
+function element(tag, klasse, text) {
+  const el = document.createElement(tag);
+  if (klasse) el.className = klasse;
+  if (text) el.textContent = text;
+  return el;
+}
+
+async function mitPin(aktion) {
+  if (!pin) pin = 'login';
+  if (!pin) return false;
+  const { error } = await aktion(pin);
+  if (error) { pin = null; zeigeFehler(error.message); return false; }
+  return true;
+}
+
+function speichereEintrag(fall, text) {
+  return mitPin(p => supabase.rpc('fall_speichern', { p_board: board, p_fall: fall, p_text: text, p_pin: p }));
+}
+
+function jsonLesen(text, ersatz) {
+  try { const w = JSON.parse(text || ''); return w ?? ersatz; } catch { return ersatz; }
+}
+
+function bilderLesen(text) {
+  const l = jsonLesen(text, []);
+  return Array.isArray(l) ? l.filter(b => typeof b === 'string' && b.startsWith('data:image/')) : [];
+}
+
+const neueId = vorsilbe => vorsilbe + Date.now().toString(36).slice(-5) + Math.random().toString(36).slice(2, 5);
+const zahl = (wert, min, max, ersatz) => Math.min(max, Math.max(min, Math.round(Number(wert)) || ersatz));
+const optionenVon = a => (a.optionen || []).map((text, i) => ({ id: 'o' + (i + 1), text }));
+
+let person = lesen('ideen-person');
+if (!person) {
+  person = Date.now().toString(36) + Math.random().toString(36).slice(2);
+  schreiben('ideen-person', person);
+}
+const personKennung = 'p' + person.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 40).padEnd(6, '0');
+let gruppe = lesen('aufgaben-gruppe-' + board);
+if (gruppe && !/^g\d{1,2}$/.test(gruppe)) gruppe = null;
+const wer = () => aufbau.modus === 'gruppen' ? gruppe : personKennung;
+
+$('gross').addEventListener('click', () => { $('gross').hidden = true; });
+function zeigeGross(src) { $('gross').querySelector('img').src = src; $('gross').hidden = false; }
+
+function bildVerkleinern(datei) {
+  return new Promise((fertig, fehler) => {
+    const url = URL.createObjectURL(datei);
+    const img = new Image();
+    img.onload = () => {
+      const faktor = Math.min(1, MAX_BILD_PIXEL / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * faktor);
+      c.height = Math.round(img.height * faktor);
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      fertig(c.toDataURL('image/jpeg', 0.8));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); fehler(new Error('Das Bild konnte nicht gelesen werden.')); };
+    img.src = url;
+  });
+}
+
+function bildKasten(src, entfernen) {
+  const kasten = element('div', 'bild-box');
+  const img = Object.assign(element('img'), { src, alt: '' });
+  img.addEventListener('click', () => zeigeGross(src));
+  kasten.append(img);
+  if (entfernen) {
+    const weg = element('button', 'weg', '✕');
+    weg.title = 'Bild entfernen';
+    weg.addEventListener('click', entfernen);
+    kasten.append(weg);
+  }
+  return kasten;
+}
+
+function bilderReihe(liste, entfernen) {
+  const r = element('div', 'bilder');
+  liste.forEach((src, i) => r.append(bildKasten(src, entfernen ? () => entfernen(i) : null)));
+  return r;
+}
+
+// Bilder einfügen per Cmd+V, Hineinziehen oder Auswahl
+function bildEingang(ziel, beiDateien) {
+  ziel.addEventListener('paste', e => {
+    const d = [...(e.clipboardData ? e.clipboardData.files : [])].filter(f => f.type.startsWith('image/'));
+    if (!d.length) return;
+    e.preventDefault();
+    beiDateien(d);
+  });
+  ziel.addEventListener('dragover', e => { e.preventDefault(); ziel.classList.add('ziel'); });
+  ziel.addEventListener('dragleave', () => ziel.classList.remove('ziel'));
+  ziel.addEventListener('drop', e => {
+    ziel.classList.remove('ziel');
+    const d = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
+    if (!d.length) return;
+    e.preventDefault();
+    beiDateien(d);
+  });
+}
+
+function dateiKnopf(text, beiDateien) {
+  const wahl = Object.assign(element('input'), { type: 'file', accept: 'image/*', multiple: true, hidden: true });
+  wahl.addEventListener('change', () => { beiDateien([...wahl.files]); wahl.value = ''; });
+  const knopf = element('button', 'klein', text);
+  knopf.type = 'button';
+  knopf.addEventListener('click', () => wahl.click());
+  const huelle = element('span');
+  huelle.append(knopf, wahl);
+  return huelle;
+}
+
+function wahlKnoepfe(werte, aktuell, beiWahl) {
+  const g = element('div', 'wahl');
+  for (const [wert, text] of werte) {
+    const k = element('button', wert === aktuell ? 'an' : '', text);
+    k.type = 'button';
+    k.addEventListener('click', () => { if (wert !== aktuell) beiWahl(wert); });
+    g.append(k);
+  }
+  return g;
+}
+
+// ======================================================================
+// Antworten anzeigen (Lehrende immer, Studierende nach Freigabe)
+// ======================================================================
+function vonText(r) {
+  if (r.wer && r.wer.startsWith('g')) return 'Gruppe ' + r.wer.slice(1);
+  return r.name || 'Anonym';
+}
+
+function antwortAnzeige(a, r, darfLoeschen) {
+  const w = jsonLesen(r.antwort, {});
+  const karte = element('div', 'antwort-karte');
+  karte.append(element('div', 'von', vonText(r)));
+  if (w.t) karte.append(element('div', 'inhalt', w.t));
+  const b = Array.isArray(w.b) ? w.b.filter(x => typeof x === 'string' && x.startsWith('data:image/')) : [];
+  if (b.length) karte.append(bilderReihe(b));
+  if (darfLoeschen) {
+    const entf = element('button', 'entf', '✕');
+    entf.title = 'Antwort löschen';
+    entf.addEventListener('click', async () => {
+      if (!confirm('Diese Antwort löschen?')) return;
+      if (await mitPin(p => supabase.rpc('antwort_loeschen', { p_id: r.id, p_pin: p }))) {
+        alleAntworten = alleAntworten.filter(x => x.id !== r.id);
+        zeichneAlleAndere();
+      }
+    });
+    karte.append(entf);
+  }
+  return karte;
+}
+
+function zeichneAndere(a, ziel) {
+  ziel.replaceChildren();
+  const lehrend = bearbeitenModus && ansicht === 'antworten';
+  if (!lehrend && !freigegeben) { ziel.hidden = true; return; }
+  const zeilen = alleAntworten.filter(r => r.aufgabe === a.id);
+  ziel.hidden = false;
+  ziel.append(element('h4', '', (lehrend ? 'Antworten' : 'Antworten aller') + ' · ' + zeilen.length));
+  if (!zeilen.length) { ziel.append(element('div', 'hinweis', 'Noch keine Antworten.')); return; }
+
+  if (a.typ === 'mc') {
+    const optionen = optionenVon(a);
+    const anzahl = new Map(optionen.map(o => [o.id, 0]));
+    for (const r of zeilen) for (const id of (jsonLesen(r.antwort, {}).o || [])) if (anzahl.has(id)) anzahl.set(id, anzahl.get(id) + 1);
+    for (const o of optionen) {
+      const n = anzahl.get(o.id);
+      const prozent = zeilen.length ? Math.round(n / zeilen.length * 100) : 0;
+      const zeile = element('div', 'balken-zeile');
+      const kopf = element('div', 'balken-kopf');
+      kopf.append(element('span', '', o.text), element('span', 'balken-wert', n + ' · ' + prozent + ' %'));
+      const spur = element('div', 'balken-spur');
+      const f = element('div', 'balken-fuellung');
+      f.style.width = prozent + '%';
+      spur.append(f);
+      zeile.append(kopf, spur);
+      ziel.append(zeile);
+    }
+    if (lehrend) {
+      const wer = zeilen.map(r => vonText(r) + ': ' + (jsonLesen(r.antwort, {}).o || [])
+        .map(id => (optionen.find(o => o.id === id) || {}).text).filter(Boolean).join(', '));
+      const details = element('details');
+      details.append(element('summary', 'hinweis', 'Wer hat was gewählt?'));
+      wer.forEach(t => details.append(element('div', 'hinweis', t)));
+      ziel.append(details);
+    }
+  } else {
+    zeilen.forEach(r => ziel.append(antwortAnzeige(a, r, lehrend)));
+  }
+}
+
+const andereZiele = new Map();
+function zeichneAlleAndere() {
+  for (const fall of aufbau.faelle) for (const a of fall.aufgaben) {
+    const ziel = andereZiele.get(a.id);
+    if (ziel) zeichneAndere(a, ziel);
+  }
+}
+
+// ======================================================================
+// Fälle mit Aufgaben (Studierende, Vorschau und Antworten-Ansicht)
+// ======================================================================
+function speichernPlanen(a, f) {
+  f.dirty = true;
+  f.status.className = 'speicher-status';
+  f.status.textContent = 'Wird gespeichert …';
+  clearTimeout(f.timer);
+  f.timer = setTimeout(() => antwortSpeichern(a, f), 1200);
+}
+
+async function antwortSpeichern(a, f) {
+  if (ansicht === 'vorschau') { f.status.textContent = 'Vorschau – wird nicht gespeichert'; f.dirty = false; return; }
+  const kennung = wer();
+  if (!kennung) return;
+  const wert = f.wert();
+  const name = aufbau.modus === 'einzeln' && aufbau.namen ? $('name-feld').value.trim() : null;
+  const { data, error } = await supabase.rpc('antwort_speichern',
+    { p_board: board, p_aufgabe: a.id, p_wer: kennung, p_name: name, p_antwort: JSON.stringify(wert) });
+  if (error) {
+    f.status.className = 'speicher-status fehler';
+    f.status.textContent = '⚠ Nicht gespeichert: ' + error.message;
+    return;
+  }
+  f.dirty = false;
+  meine.set(a.id, { antwort: wert, zeit: data });
+  const zeit = new Date(data || Date.now()).toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' });
+  f.status.className = 'speicher-status';
+  f.status.textContent = '✓ Gespeichert um ' + zeit;
+}
+
+function aufgabeBauen(a, nr, nurLesen) {
+  const box = element('div', 'aufgabe' + (a.typ === 'info' ? ' info' : ''));
+  const frage = element('div', 'frage');
+  if (a.typ !== 'info') frage.append(element('span', 'nr', 'Aufgabe ' + nr + ':'));
+  frage.append(document.createTextNode(a.text || ''));
+  box.append(frage);
+  box.append(bilderReihe(bilder['a-' + a.id] || []));
+  if (a.typ === 'info') return box;
+
+  if (!nurLesen) {
+    const f = { dirty: false, timer: null, status: element('div', 'speicher-status') };
+    const gespeichert = (meine.get(a.id) || {}).antwort || {};
+
+    if (a.typ === 'mc') {
+      let gewaehlt = Array.isArray(gespeichert.o) ? [...gespeichert.o] : [];
+      const liste = element('div');
+      const zeichneOptionen = () => {
+        liste.replaceChildren();
+        if (a.mehrfach) liste.append(element('div', 'hinweis', 'Mehrere Antworten möglich.'));
+        for (const o of optionenVon(a)) {
+          const an = gewaehlt.includes(o.id);
+          const k = element('button', 'option' + (an ? ' gewaehlt' : ''));
+          k.type = 'button';
+          k.append(element('span', 'haken', a.mehrfach ? (an ? '☑' : '☐') : (an ? '●' : '○')), element('span', '', o.text));
+          k.addEventListener('click', () => {
+            gewaehlt = a.mehrfach ? (an ? gewaehlt.filter(x => x !== o.id) : [...gewaehlt, o.id]) : [o.id];
+            zeichneOptionen();
+            clearTimeout(f.timer);
+            f.dirty = true;
+            antwortSpeichern(a, f);
+          });
+          liste.append(k);
+        }
+      };
+      zeichneOptionen();
+      f.wert = () => ({ o: gewaehlt });
+      f.setzen = w => { gewaehlt = Array.isArray(w.o) ? [...w.o] : []; zeichneOptionen(); };
+      box.append(liste);
+    } else if (a.typ === 'kurz') {
+      const eingabe = Object.assign(element('input'), { type: 'text', maxLength: 300, placeholder: 'Kurze Antwort …' });
+      eingabe.value = gespeichert.t || '';
+      eingabe.addEventListener('input', () => speichernPlanen(a, f));
+      f.wert = () => ({ t: eingabe.value });
+      f.setzen = w => { if (document.activeElement !== eingabe) eingabe.value = w.t || ''; };
+      box.append(eingabe);
+    } else {
+      const feld = element('textarea');
+      feld.rows = 5;
+      feld.maxLength = 10000;
+      feld.placeholder = 'Antwort … (Bilder mit Cmd+V einfügen)';
+      feld.value = gespeichert.t || '';
+      let antwortBilder = Array.isArray(gespeichert.b) ? [...gespeichert.b] : [];
+      const reihe = element('div');
+      const zeichneAntwortBilder = () => reihe.replaceChildren(bilderReihe(antwortBilder, i => {
+        antwortBilder.splice(i, 1); zeichneAntwortBilder(); speichernPlanen(a, f);
+      }));
+      const hinzufuegen = async dateien => {
+        for (const d of dateien) {
+          if (antwortBilder.length >= MAX_BILDER_ANTWORT) { zeigeFehler('Höchstens ' + MAX_BILDER_ANTWORT + ' Bilder pro Antwort.'); break; }
+          try { antwortBilder.push(await bildVerkleinern(d)); } catch (err) { zeigeFehler(err.message); }
+        }
+        zeichneAntwortBilder();
+        speichernPlanen(a, f);
+      };
+      feld.addEventListener('input', () => speichernPlanen(a, f));
+      bildEingang(feld, hinzufuegen);
+      zeichneAntwortBilder();
+      const knoepfe = element('div', 'bild-knopf-zeile');
+      knoepfe.append(dateiKnopf('🖼 Bild hinzufügen', hinzufuegen));
+      f.wert = () => ({ t: feld.value, b: antwortBilder });
+      f.setzen = w => {
+        if (document.activeElement !== feld) feld.value = w.t || '';
+        antwortBilder = Array.isArray(w.b) ? [...w.b] : [];
+        zeichneAntwortBilder();
+      };
+      box.append(feld, reihe, knoepfe);
+    }
+    box.append(f.status);
+    felder.set(a.id, f);
+  }
+
+  const andere = element('div', 'andere');
+  andere.hidden = true;
+  andereZiele.set(a.id, andere);
+  box.append(andere);
+  zeichneAndere(a, andere);
+  return box;
+}
+
+function zeichneFaelle() {
+  const ziel = $('faelle');
+  ziel.replaceChildren();
+  felder.clear();
+  andereZiele.clear();
+  const sichtbar = ansicht !== 'vorbereiten';
+  ziel.hidden = !sichtbar;
+  $('leer-hinweis').hidden = !sichtbar || aufbau.faelle.length > 0;
+  if (!sichtbar) { $('gruppe-waehlen').hidden = true; $('wer-kopf').hidden = true; return; }
+
+  const lehrAnsicht = ansicht === 'antworten';
+  // Gruppe oder Person
+  if (!lehrAnsicht && aufbau.modus === 'gruppen' && aufbau.faelle.length) {
+    if (gruppe && Number(gruppe.slice(1)) > aufbau.gruppen) gruppe = null;
+    if (!gruppe) {
+      $('wer-kopf').hidden = true;
+      $('gruppe-waehlen').hidden = false;
+      const k = $('gruppen-knoepfe');
+      k.replaceChildren();
+      for (let i = 1; i <= aufbau.gruppen; i++) {
+        const b = element('button', '', 'Gruppe ' + i);
+        b.addEventListener('click', async () => {
+          gruppe = 'g' + i;
+          if (ansicht !== 'vorschau') schreiben('aufgaben-gruppe-' + board, gruppe);
+          await meineLaden();
+          zeichneFaelle();
+        });
+        k.append(b);
+      }
+      return;
+    }
+  }
+  $('gruppe-waehlen').hidden = true;
+  $('wer-kopf').hidden = lehrAnsicht || !aufbau.faelle.length;
+  $('wer-name').textContent = aufbau.modus === 'gruppen' ? 'Gruppe ' + (gruppe || '').slice(1) : '';
+  $('gruppe-wechseln').hidden = aufbau.modus !== 'gruppen';
+  $('name-zeile').hidden = !(aufbau.modus === 'einzeln' && aufbau.namen);
+
+  aufbau.faelle.forEach((fall, i) => {
+    const box = element('div', 'fall');
+    box.append(element('h2', '', fall.titel || 'Fall ' + (i + 1)));
+    if (fall.text) box.append(element('div', 'beschreibung', fall.text));
+    box.append(bilderReihe(bilder['f-' + fall.id] || []));
+    let nr = 0;
+    for (const a of fall.aufgaben) {
+      if (a.typ !== 'info') nr++;
+      box.append(aufgabeBauen(a, nr, lehrAnsicht));
+    }
+    ziel.append(box);
+  });
+}
+
+$('gruppe-wechseln').addEventListener('click', () => {
+  gruppe = null;
+  if (ansicht !== 'vorschau') schreiben('aufgaben-gruppe-' + board, null);
+  meine.clear();
+  zeichneFaelle();
+});
+$('name-feld').value = lesen('aufgaben-name') || '';
+$('name-feld').addEventListener('change', () => {
+  schreiben('aufgaben-name', $('name-feld').value.trim());
+  // Name bei allen schon beantworteten Aufgaben nachtragen
+  for (const [id, f] of felder) if (meine.has(id)) speichernPlanen(findeAufgabe(id), f);
+});
+
+function findeAufgabe(id) {
+  for (const fall of aufbau.faelle) for (const a of fall.aufgaben) if (a.id === id) return a;
+  return null;
+}
+
+async function meineLaden() {
+  meine.clear();
+  const kennung = wer();
+  if (!kennung || ansicht === 'vorschau' || ansicht === 'antworten') return;
+  const { data, error } = await supabase.rpc('meine_antworten', { p_board: board, p_wer: kennung });
+  if (error) { zeigeFehler(error.message); return; }
+  for (const r of data || []) meine.set(r.aufgabe, { antwort: jsonLesen(r.antwort, {}), zeit: r.updated_at });
+  if (aufbau.modus === 'einzeln' && !$('name-feld').value) {
+    const mitName = (data || []).find(r => r.name);
+    if (mitName) $('name-feld').value = mitName.name;
+  }
+}
+
+async function alleLaden() {
+  const lehrend = bearbeitenModus && ansicht === 'antworten';
+  if (!lehrend && !freigegeben) { alleAntworten = []; zeichneAlleAndere(); return; }
+  const { data, error } = await supabase.rpc('antworten_lesen', { p_board: board });
+  if (error) { zeigeFehler(error.message); return; }
+  alleAntworten = data || [];
+  zeichneAlleAndere();
+}
+
+// Regelmäßig nachsehen: Antworten der eigenen Gruppe und (nach Freigabe) aller
+async function abgleichen() {
+  if (document.hidden) return;
+  if (ansicht === 'studierende' && aufbau.modus === 'gruppen' && gruppe) {
+    const { data } = await supabase.rpc('meine_antworten', { p_board: board, p_wer: gruppe });
+    for (const r of data || []) {
+      const alt = meine.get(r.aufgabe);
+      if (alt && alt.zeit === r.updated_at) continue;
+      const f = felder.get(r.aufgabe);
+      const w = jsonLesen(r.antwort, {});
+      meine.set(r.aufgabe, { antwort: w, zeit: r.updated_at });
+      if (f && !f.dirty) f.setzen(w);
+    }
+  }
+  await alleLaden();
+}
+setInterval(abgleichen, bearbeitenModus ? 5000 : 10000);
+
+// ======================================================================
+// Lehrende: Steuerung, Reiter, Freigabe, CSV
+// ======================================================================
+function zeichneSteuerung() {
+  if (!bearbeitenModus) return;
+  for (const [id, wert] of [['reiter-antworten', 'antworten'], ['reiter-vorbereiten', 'vorbereiten'], ['reiter-vorschau', 'vorschau']]) {
+    $(id).classList.toggle('an', ansicht === wert);
+  }
+  $('freigabe-knopf').textContent = freigegeben ? '🔓 Antworten wieder verbergen' : '🔒 Antworten für alle freigeben';
+  $('freigabe-knopf').classList.toggle('haupt', !freigegeben);
+  $('freigabe-hinweis').textContent = freigegeben
+    ? 'Die Studierenden sehen gerade unter jeder Aufgabe die Antworten aller.'
+    : 'Im Moment sehen nur du (und Personen, mit denen du die Sammlung teilst) die Antworten.';
+  $('editor').hidden = ansicht !== 'vorbereiten';
+  $('titel').textContent = ansicht === 'vorschau' ? 'Fallarbeit – Vorschau für Studierende' : 'Fallarbeit mit Aufgaben';
+}
+
+async function ansichtWechseln(neu) {
+  if (ansicht === 'vorbereiten' && geaendert && !confirm('Es gibt ungespeicherte Änderungen. Trotzdem wechseln?')) return;
+  if (ansicht === 'vorbereiten' && geaendert) {
+    geaendert = false;
+    $('ungespeichert').hidden = true;
+    entwurf = JSON.parse(JSON.stringify(aufbau));
+    entwurfBilder = JSON.parse(JSON.stringify(bilder));
+  }
+  ansicht = neu;
+  if (neu === 'vorschau') { gruppe = null; meine.clear(); }
+  if (neu === 'vorbereiten') zeichneEditor();
+  zeichneSteuerung();
+  zeichneFaelle();
+  if (neu === 'antworten') alleLaden();
+}
+
+function csvHerunterladen() {
+  const zeilen = [['Fall', 'Aufgabe', 'Typ', 'Aufgabentext', 'Von', 'Antwort', 'Bilder', 'Zeit']];
+  aufbau.faelle.forEach((fall, i) => {
+    let nr = 0;
+    for (const a of fall.aufgaben) {
+      if (a.typ === 'info') continue;
+      nr++;
+      for (const r of alleAntworten.filter(x => x.aufgabe === a.id)) {
+        const w = jsonLesen(r.antwort, {});
+        const text = a.typ === 'mc'
+          ? (w.o || []).map(id => (optionenVon(a).find(o => o.id === id) || {}).text).filter(Boolean).join('; ')
+          : (w.t || '');
+        zeilen.push([fall.titel || 'Fall ' + (i + 1), nr, (TYPEN.find(t => t[0] === a.typ) || [, a.typ])[1].replace(/^\S+\s/, ''),
+          a.text || '', vonText(r), text, Array.isArray(w.b) ? w.b.length : 0,
+          new Date(r.updated_at).toLocaleString('de-AT')]);
+      }
+    }
+  });
+  const zelle = s => '"' + String(s).replace(/"/g, '""') + '"';
+  const blob = new Blob(['﻿' + zeilen.map(z => z.map(zelle).join(';')).join('\n')], { type: 'text/csv;charset=utf-8' });
+  const link = element('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'antworten-' + board + '-' + new Date().toISOString().slice(0, 10) + '.csv';
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+
+if (bearbeitenModus) {
+  $('steuerung').hidden = false;
+  $('reiter-antworten').addEventListener('click', () => ansichtWechseln('antworten'));
+  $('reiter-vorbereiten').addEventListener('click', () => ansichtWechseln('vorbereiten'));
+  $('reiter-vorschau').addEventListener('click', () => ansichtWechseln('vorschau'));
+  $('freigabe-knopf').addEventListener('click', async () => {
+    const neu = !freigegeben;
+    if (await speichereEintrag('freigabe', neu ? 'ja' : 'nein')) { freigegeben = neu; zeichneSteuerung(); zeichneAlleAndere(); }
+  });
+  $('csv-knopf').addEventListener('click', async () => { await alleLaden(); csvHerunterladen(); });
+  $('alle-loeschen').addEventListener('click', async () => {
+    if (!confirm('Wirklich ALLE Antworten dieser Fallarbeit löschen? Das lässt sich nicht rückgängig machen.')) return;
+    if (await mitPin(p => supabase.rpc('antworten_loeschen', { p_board: board, p_pin: p }))) { alleAntworten = []; zeichneAlleAndere(); }
+  });
+}
+
+// ======================================================================
+// Lehrende: Fälle und Aufgaben vorbereiten
+// ======================================================================
+function markiereGeaendert() { geaendert = true; $('ungespeichert').hidden = false; }
+
+async function bilderZu(schluessel, dateien, max) {
+  const liste = entwurfBilder[schluessel] || (entwurfBilder[schluessel] = []);
+  for (const d of dateien) {
+    if (liste.length >= max) { zeigeFehler('Höchstens ' + max + ' Bilder an dieser Stelle.'); break; }
+    try { liste.push(await bildVerkleinern(d)); } catch (err) { zeigeFehler(err.message); }
+  }
+  markiereGeaendert();
+  zeichneEditor();
+}
+
+function bildBereich(schluessel, max) {
+  const huelle = element('div');
+  huelle.append(bilderReihe(entwurfBilder[schluessel] || [], i => {
+    entwurfBilder[schluessel].splice(i, 1); markiereGeaendert(); zeichneEditor();
+  }));
+  const zeile = element('div', 'bild-knopf-zeile');
+  zeile.append(dateiKnopf('🖼 Bild auswählen', d => bilderZu(schluessel, d, max)));
+  huelle.append(zeile);
+  return huelle;
+}
+
+function verschiebeKnoepfe(liste, i) {
+  const huelle = element('span');
+  const hoch = element('button', 'klein', '↑');
+  hoch.disabled = i === 0;
+  hoch.addEventListener('click', () => { [liste[i - 1], liste[i]] = [liste[i], liste[i - 1]]; markiereGeaendert(); zeichneEditor(); });
+  const runter = element('button', 'klein', '↓');
+  runter.disabled = i === liste.length - 1;
+  runter.addEventListener('click', () => { [liste[i + 1], liste[i]] = [liste[i], liste[i + 1]]; markiereGeaendert(); zeichneEditor(); });
+  huelle.append(hoch, ' ', runter);
+  return huelle;
+}
+
+function zeichneEditor() {
+  const e = entwurf;
+  $('modus-wahl').replaceChildren(wahlKnoepfe([['gruppen', '👥 Gruppen'], ['einzeln', '👤 Jede Person einzeln']], e.modus,
+    wert => { e.modus = wert; markiereGeaendert(); zeichneEditor(); }));
+  $('gruppen-einstellung').hidden = e.modus !== 'gruppen';
+  $('namen-einstellung').hidden = e.modus !== 'einzeln';
+  $('gruppen-feld').value = e.gruppen;
+  $('namen-feld').checked = e.namen;
+
+  const ziel = $('e-faelle');
+  ziel.replaceChildren();
+  if (!e.faelle.length) ziel.append(element('p', 'hinweis', 'Noch keine Fälle. Leg unten einen Fall an.'));
+  e.faelle.forEach((fall, fi) => {
+    const box = element('div', 'e-fall');
+    const kopf = element('div', 'e-kopf');
+    kopf.append(element('span', 'nummer', 'Fall ' + (fi + 1)), verschiebeKnoepfe(e.faelle, fi));
+    const weg = element('button', 'klein', '✕ Fall löschen');
+    weg.addEventListener('click', () => {
+      if (!confirm('Fall ' + (fi + 1) + ' mit allen Aufgaben löschen?')) return;
+      e.faelle.splice(fi, 1); markiereGeaendert(); zeichneEditor();
+    });
+    kopf.append(weg);
+    box.append(kopf);
+
+    const titel = Object.assign(element('input'), { type: 'text', maxLength: 150, placeholder: 'Titel, z. B. Fall 1: Familie M.' });
+    titel.value = fall.titel || '';
+    titel.addEventListener('input', () => { fall.titel = titel.value; markiereGeaendert(); });
+    const text = element('textarea');
+    text.rows = 4;
+    text.maxLength = 10000;
+    text.placeholder = 'Fallbeschreibung … (Bilder mit Cmd+V einfügen)';
+    text.value = fall.text || '';
+    text.addEventListener('input', () => { fall.text = text.value; markiereGeaendert(); });
+    bildEingang(text, d => bilderZu('f-' + fall.id, d, MAX_BILDER_FALL));
+    text.style.marginTop = '.5rem';
+    box.append(titel, text, bildBereich('f-' + fall.id, MAX_BILDER_FALL));
+
+    let nr = 0;
+    fall.aufgaben.forEach((a, ai) => {
+      if (a.typ !== 'info') nr++;
+      const ab = element('div', 'e-aufgabe');
+      const ak = element('div', 'e-kopf');
+      ak.append(element('span', 'nummer', a.typ === 'info' ? 'Information' : 'Aufgabe ' + nr));
+      ak.append(verschiebeKnoepfe(fall.aufgaben, ai));
+      const aweg = element('button', 'klein', '✕');
+      aweg.title = 'Aufgabe löschen';
+      aweg.addEventListener('click', () => {
+        if (!confirm('Diese Aufgabe löschen?')) return;
+        fall.aufgaben.splice(ai, 1); markiereGeaendert(); zeichneEditor();
+      });
+      ak.append(aweg);
+      ab.append(ak);
+      ab.append(wahlKnoepfe(TYPEN, a.typ, wert => { a.typ = wert; markiereGeaendert(); zeichneEditor(); }));
+
+      const frage = element('textarea');
+      frage.rows = a.typ === 'info' ? 3 : 2;
+      frage.maxLength = 5000;
+      frage.placeholder = a.typ === 'info' ? 'Information, Hinweis oder Zwischentext …' : 'Aufgabe oder Frage …';
+      frage.value = a.text || '';
+      frage.addEventListener('input', () => { a.text = frage.value; markiereGeaendert(); });
+      bildEingang(frage, d => bilderZu('a-' + a.id, d, MAX_BILDER_AUFGABE));
+      ab.append(frage, bildBereich('a-' + a.id, MAX_BILDER_AUFGABE));
+
+      if (a.typ === 'mc') {
+        ab.append(element('div', 'klein-titel', 'Antwortmöglichkeiten (eine pro Zeile, höchstens ' + MAX_OPTIONEN + ')'));
+        const opt = element('textarea');
+        opt.rows = 4;
+        opt.value = (a.optionen || []).join('\n');
+        opt.addEventListener('input', () => {
+          a.optionen = opt.value.split('\n').map(s => s.trim()).filter(Boolean).slice(0, MAX_OPTIONEN);
+          markiereGeaendert();
+        });
+        const mehr = element('label', 'haken-zeile');
+        const kasten = Object.assign(element('input'), { type: 'checkbox', checked: !!a.mehrfach });
+        kasten.addEventListener('change', () => { a.mehrfach = kasten.checked; markiereGeaendert(); });
+        mehr.append(kasten, 'Mehrere Antworten erlauben');
+        ab.append(opt, mehr);
+      }
+      box.append(ab);
+    });
+
+    const neu = element('div', 'zeile');
+    for (const [typ, name] of TYPEN) {
+      const k = element('button', 'klein', '+ ' + name);
+      k.addEventListener('click', () => {
+        fall.aufgaben.push({ id: neueId('a'), typ, text: '', optionen: [], mehrfach: false });
+        markiereGeaendert();
+        zeichneEditor();
+      });
+      neu.append(k);
+    }
+    box.append(neu);
+    ziel.append(box);
+  });
+}
+
+if (bearbeitenModus) {
+  $('gruppen-feld').addEventListener('change', () => { entwurf.gruppen = zahl($('gruppen-feld').value, 1, 20, 6); markiereGeaendert(); zeichneEditor(); });
+  $('namen-feld').addEventListener('change', () => { entwurf.namen = $('namen-feld').checked; markiereGeaendert(); });
+  $('neuer-fall').addEventListener('click', () => {
+    entwurf.faelle.push({ id: neueId('f'), titel: 'Fall ' + (entwurf.faelle.length + 1), text: '',
+      aufgaben: [{ id: neueId('a'), typ: 'text', text: '', optionen: [], mehrfach: false }] });
+    markiereGeaendert();
+    zeichneEditor();
+  });
+  $('speichern').addEventListener('click', async () => {
+    const knopf = $('speichern');
+    knopf.disabled = true;
+    let ok = true;
+    for (const [schluessel, liste] of Object.entries(entwurfBilder)) {
+      const neu = JSON.stringify(liste || []);
+      if (neu !== JSON.stringify(bilder[schluessel] || [])) {
+        ok = await speichereEintrag('bild-' + schluessel, neu);
+        if (!ok) break;
+        bilder[schluessel] = [...(liste || [])];
+      }
+    }
+    const daten = JSON.parse(JSON.stringify(entwurf));
+    if (ok) ok = await speichereEintrag('aufgaben', JSON.stringify(daten));
+    knopf.disabled = false;
+    if (ok) {
+      aufbau = daten;
+      geaendert = false;
+      $('ungespeichert').hidden = true;
+      knopf.textContent = 'Gespeichert ✓';
+      setTimeout(() => { knopf.textContent = 'Alles speichern'; }, 2000);
+    }
+  });
+  window.addEventListener('beforeunload', ev => { if (geaendert) { ev.preventDefault(); ev.returnValue = ''; } });
+}
+
+// ======================================================================
+// Laden und Live-Aktualisierung
+// ======================================================================
+function verarbeite(z) {
+  if (z.fall === 'aufgaben') {
+    aufbau = { ...LEER, ...jsonLesen(z.beschreibung, {}) };
+    if (!Array.isArray(aufbau.faelle)) aufbau.faelle = [];
+    if (bearbeitenModus && !geaendert) { entwurf = JSON.parse(JSON.stringify(aufbau)); if (ansicht === 'vorbereiten') zeichneEditor(); }
+    return 'neu';
+  }
+  if (z.fall === 'freigabe') {
+    freigegeben = z.beschreibung === 'ja';
+    return 'freigabe';
+  }
+  if (z.fall.startsWith('bild-')) {
+    const schluessel = z.fall.slice(5);
+    bilder[schluessel] = bilderLesen(z.beschreibung);
+    if (bearbeitenModus && !geaendert) entwurfBilder[schluessel] = [...bilder[schluessel]];
+    return 'neu';
+  }
+  return null;
+}
+
+async function nachladen(fall) {
+  const { data, error } = await supabase.from('faelle').select('*').eq('board', board).eq('fall', fall).maybeSingle();
+  if (error) zeigeFehler(error.message);
+  else if (data && verarbeite(data) && !(bearbeitenModus && ansicht === 'vorbereiten')) zeichneFaelle();
+}
+
+try {
+  const { data, error } = await supabase.from('faelle').select('*').eq('board', board);
+  if (error) throw error;
+  const zeilen = data || [];
+  zeilen.filter(z => z.fall.startsWith('bild-')).forEach(verarbeite);
+  zeilen.filter(z => z.fall !== 'aufgaben' && !z.fall.startsWith('bild-')).forEach(verarbeite);
+  zeilen.filter(z => z.fall === 'aufgaben').forEach(verarbeite);
+} catch (err) {
+  zeigeFehler(err.message || String(err));
+}
+if (bearbeitenModus) {
+  if (!entwurf) entwurf = JSON.parse(JSON.stringify(aufbau));
+  entwurfBilder = JSON.parse(JSON.stringify(bilder));
+  if (!aufbau.faelle.length) ansicht = 'vorbereiten';
+  if (ansicht === 'vorbereiten') zeichneEditor();
+  zeichneSteuerung();
+}
+await meineLaden();
+zeichneFaelle();
+alleLaden();
+
+supabase.channel('aufgaben-' + board)
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'faelle', filter: 'board=eq.' + board },
+      p => {
+        if (!p.new || !p.new.fall) return;
+        if (p.new.fall.startsWith('bild-')) { nachladen(p.new.fall); return; }
+        const was = verarbeite(p.new);
+        if (was === 'freigabe') { zeichneSteuerung(); alleLaden(); }
+        else if (was === 'neu' && !(bearbeitenModus && ansicht === 'vorbereiten')) zeichneFaelle();
+      })
+  .subscribe(status => {
+    if (status === 'SUBSCRIBED') $('status').textContent = bearbeitenModus ? '● Live verbunden – Bearbeiten-Modus' : '● Live verbunden';
+    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') $('status').textContent = '○ Keine Live-Verbindung (siehe Teil 6)';
+  });
+</script>
+
+<footer style="text-align:center; font: .85rem system-ui, sans-serif; padding: 1.5rem 1rem; color: #555;">
+  <a href="impressum.html" style="color: inherit;">Impressum</a> ·
+  <a href="datenschutz.html" style="color: inherit;">Datenschutz</a>
+</footer>
+</body>
+</html>
