@@ -785,6 +785,22 @@ function zeichneEditor() {
     const box = element('div', 'e-fall');
     const kopf = element('div', 'e-kopf');
     kopf.append(element('span', 'nummer', 'Fall ' + (fi + 1)), verschiebeKnoepfe(e.faelle, fi));
+    const kopie = element('button', 'klein', '⧉ Fall kopieren');
+       kopie.addEventListener('click', () => {
+         const neu = JSON.parse(JSON.stringify(fall));
+         neu.id = neueId('f');
+         neu.titel = (fall.titel || 'Fall ' + (fi + 1)) + ' (Kopie)';
+         if (entwurfBilder['f-' + fall.id]) entwurfBilder['f-' + neu.id] = [...entwurfBilder['f-' + fall.id]];
+         neu.aufgaben.forEach(a => {
+           const alt = a.id;
+           a.id = neueId('a');
+           if (entwurfBilder['a-' + alt]) entwurfBilder['a-' + a.id] = [...entwurfBilder['a-' + alt]];
+         });
+         e.faelle.splice(fi + 1, 0, neu);
+         markiereGeaendert();
+         zeichneEditor();
+       });
+       kopf.append(kopie);
     const weg = element('button', 'klein', '✕ Fall löschen');
     weg.addEventListener('click', () => {
       if (!confirm('Fall ' + (fi + 1) + ' mit allen Aufgaben löschen?')) return;
