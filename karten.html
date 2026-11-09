@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kartenstapel</title>
+<style>
+  /* >>> Farben: Pflaume <<< */
+  :root {
+    --hintergrund: #f7eff5;
+    --flaeche:     #ffffff;
+    --text:        #2a1426;
+    --leise:       #6b4f64;
+    --rahmen:      #e6cfe0;
+    --akzent:      #7a2e63;
+    --akzent-hell: #f1dcea;
+    --kartenruecken: #7a2e63;
+  }
+  [hidden] { display: none !important; }
+
+  body { font-family: system-ui, sans-serif; margin: 0; background: var(--hintergrund); color: var(--text); }
+  main { max-width: 1000px; margin: 0 auto; padding: 2rem 1.5rem; }
+  #status { font-size: .9rem; color: var(--leise); margin-bottom: .8rem; }
+  #fehler { background: #fbebeb; color: #a00; padding: .8rem; border-radius: 8px; margin-bottom: 1rem; }
+  h1 { margin: .2rem 0 .4rem; }
+  #auftrag { font-size: 1.15rem; white-space: pre-wrap; margin: 0 0 1.5rem; }
+  .box { background: var(--flaeche); border: 1px solid var(--rahmen); border-radius: 14px; padding: 1.2rem; margin-bottom: 1.5rem; }
+  .box h2 { margin: 0 0 1rem; font-size: 1.2rem; }
+  .steuerung { background: var(--akzent-hell); border: 2px solid var(--akzent); }
+  textarea { width: 100%; box-sizing: border-box; padding: .55rem; font: inherit; border: 1px solid var(--rahmen);
+             border-radius: 8px; background: #fff; }
+  textarea:focus, input:focus { outline: 2px solid var(--akzent); outline-offset: 1px; }
+  input[type=number] { width: 4.5rem; padding: .4rem; font: inherit; border: 1px solid var(--rahmen); border-radius: 8px; }
+  .zeile { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-top: .8rem; }
+  button { padding: .55rem 1.1rem; font-size: 1rem; cursor: pointer; border-radius: 999px;
+           border: 1px solid var(--rahmen); background: var(--flaeche); color: var(--text); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.haupt { background: var(--akzent); border-color: var(--akzent); color: #fff; font-weight: 600; }
+  button.klein { padding: .25rem .65rem; font-size: .9rem; }
+  .hinweis { font-size: .9rem; color: var(--leise); margin: .6rem 0 0; }
+  .ungespeichert { color: #8a4b00; font-weight: 600; font-size: .9rem; margin: .8rem 0 0; }
+
+  /* Gruppenwahl */
+  .gruppen-wahl { display: flex; flex-wrap: wrap; gap: .6rem; }
+  .gruppen-wahl button { font-size: 1.1rem; padding: .8rem 1.4rem; border-radius: 12px; }
+  #gruppe-kopf { display: flex; align-items: baseline; gap: .8rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  #gruppe-name { font-size: 1.3rem; font-weight: 700; }
+  a.leise { color: var(--leise); font-size: .9rem; cursor: pointer; text-decoration: underline; }
+
+  /* Stapel */
+  .tisch { display: flex; flex-wrap: wrap; gap: 2rem; align-items: flex-start; }
+  .stapel-bereich { display: flex; flex-direction: column; align-items: center; gap: .8rem; }
+  .stapel { position: relative; width: 200px; height: 270px; }
+  .stapel .karte { position: absolute; inset: 0; }
+  .stapel .karte:nth-child(1) { transform: translate(8px, 8px) rotate(3deg); }
+  .stapel .karte:nth-child(2) { transform: translate(4px, 4px) rotate(-2deg); }
+  .stapel.leer .karte { opacity: .25; }
+  #ziehen { font-size: 1.1rem; padding: .7rem 1.4rem; }
+  #rest { font-size: .9rem; color: var(--leise); text-align: center; }
+  .gezogen { display: flex; flex-wrap: wrap; gap: 1.2rem; flex: 1; min-width: 220px; }
+  .gezogen-leer { color: var(--leise); font-style: italic; align-self: center; }
+
+  /* Karten mit Vorder- und Rückseite */
+  .karte { width: 200px; height: 270px; perspective: 1000px; }
+  .karte.gross { width: 260px; height: 350px; }
+  .karte .innen { position: relative; width: 100%; height: 100%; transition: transform .6s; transform-style: preserve-3d; }
+  .karte.umgedreht .innen { transform: rotateY(180deg); }
+  .karte .seite { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+                  border-radius: 14px; box-shadow: 0 3px 10px rgba(0,0,0,.18); background: #fff; border: 2px solid var(--rahmen);
+                  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .6rem;
+                  padding: 1rem; box-sizing: border-box; overflow: hidden; text-align: center; }
+  .karte .seite.hinten { transform: rotateY(180deg); }
+  .karte .seite img { max-width: 100%; max-height: 60%; object-fit: contain; border-radius: 8px; }
+  .karte .seite.nur-bild img { max-height: 100%; }
+  .karte .seite .text { white-space: pre-wrap; overflow-wrap: anywhere; overflow-y: auto; font-size: 1.05rem; }
+  .karte .seite.muster { background: repeating-linear-gradient(45deg, var(--kartenruecken) 0 12px, #8e3d75 12px 24px);
+                         color: #fff; border-color: var(--kartenruecken); }
+  .karte .seite.muster .symbol { font-size: 3.5rem; font-weight: 800; }
+  .karte.klickbar { cursor: pointer; }
+  .karte.neu { animation: herein .5s ease-out; }
+  @keyframes herein { from { transform: translateY(-30px) scale(.85); opacity: 0; } to { transform: none; opacity: 1; } }
+  .karte-unter { font-size: .85rem; color: var(--leise); text-align: center; margin-top: .4rem; }
+
+  /* Übersicht der Gruppen (Lehrende und Beamer) */
+  .uebersicht { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1rem; }
+  .gruppe-box { background: #fff; border: 1px solid var(--rahmen); border-radius: 12px; padding: .8rem; }
+  .gruppe-box h3 { margin: 0 0 .5rem; font-size: 1.05rem; display: flex; justify-content: space-between; align-items: center; gap: .4rem; }
+  .gruppe-box .gezogen { gap: .6rem; }
+  .chip { display: inline-block; background: var(--akzent-hell); border-radius: 999px; padding: .2rem .7rem; margin: .15rem .2rem 0 0; font-size: .9rem; }
+  body.beamer main { max-width: 1400px; }
+
+  /* Karten vorbereiten */
+  .wahl { display: inline-flex; border: 1px solid var(--rahmen); border-radius: 999px; overflow: hidden; flex-wrap: wrap; }
+  .wahl button { border: none; border-radius: 0; padding: .4rem .9rem; font-size: .95rem; background: #fff; }
+  .wahl button + button { border-left: 1px solid var(--rahmen); }
+  .wahl button.an { background: var(--akzent); color: #fff; }
+  .einstellung { display: flex; flex-wrap: wrap; gap: 1rem 1.6rem; align-items: center; margin-top: .9rem; }
+  .einstellung label { display: flex; align-items: center; gap: .45rem; }
+  .karten-editor { margin-top: 1rem; }
+  .k-karte { background: #fff; border: 1px solid var(--rahmen); border-radius: 12px; padding: .9rem; margin-bottom: .9rem; }
+  .k-kopf { display: flex; align-items: center; gap: .4rem; margin-bottom: .6rem; }
+  .k-kopf .nummer { font-weight: 700; margin-right: auto; }
+  .seiten { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
+  .seiten.eine { grid-template-columns: 1fr; }
+  @media (max-width: 640px) { .seiten { grid-template-columns: 1fr; } }
+  .seiten-feld .titel { font-size: .85rem; font-weight: 600; color: var(--leise); margin-bottom: .3rem; }
+  .seiten-feld.ziel textarea { outline: 3px dashed var(--akzent); }
+  .bild-mini { display: flex; align-items: center; gap: .5rem; margin-top: .4rem; flex-wrap: wrap; }
+  .bild-mini img { height: 70px; border-radius: 6px; border: 1px solid var(--rahmen); }
+  details.schnell { margin-top: 1rem; }
+  details.schnell summary { cursor: pointer; font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <div id="status">Verbinde …</div>
+  <div id="fehler" hidden></div>
+  <h1 id="titel">Kartenstapel</h1>
+  <p id="auftrag" hidden></p>
+
+  <!-- Studierende: Gruppe wählen -->
+  <div class="box" id="gruppe-waehlen" hidden>
+    <h2>Welche Gruppe seid ihr?</h2>
+    <div class="gruppen-wahl" id="gruppen-knoepfe"></div>
+  </div>
+
+  <!-- Studierende: Stapel und gezogene Karten -->
+  <div id="spiel" hidden>
+    <div id="gruppe-kopf">
+      <span id="gruppe-name"></span>
+      <a class="leise" id="gruppe-wechseln">Gruppe wechseln</a>
+    </div>
+    <div class="tisch">
+      <div class="stapel-bereich">
+        <div class="stapel" id="stapel"></div>
+        <button class="haupt" id="ziehen">🎴 Karte ziehen</button>
+        <div id="rest"></div>
+      </div>
+      <div class="gezogen" id="meine-karten"></div>
+    </div>
+  </div>
+
+  <p class="hinweis" id="keine-karten" hidden>Hier gibt es noch keine Karten.</p>
+
+  <!-- Lehrende und Beamer: Übersicht aller Gruppen -->
+  <div class="box steuerung" id="uebersicht-box" hidden>
+    <h2>Gezogene Karten</h2>
+    <div class="uebersicht" id="uebersicht"></div>
+    <div class="zeile" id="uebersicht-knoepfe">
+      <button id="alle-zurueck">Alle Karten zurücklegen und neu mischen</button>
+      <button id="beamer-knopf">Beamer-Ansicht öffnen</button>
+    </div>
+  </div>
+
+  <!-- Lehrende: Karten vorbereiten -->
+  <div class="box steuerung" id="editor" hidden>
+    <h2>Karten vorbereiten</h2>
+    <textarea id="auftrag-feld" rows="2" maxlength="1000" placeholder="Arbeitsauftrag, z. B. Zieht eine Karte und bearbeitet die Übung in 10 Minuten."></textarea>
+    <div class="einstellung">
+      <span>Kartenart:</span>
+      <span id="modus-wahl"></span>
+    </div>
+    <div class="einstellung">
+      <label>Gruppen <input type="number" id="gruppen-feld" min="1" max="12"></label>
+      <label>Karten pro Gruppe <input type="number" id="pro-gruppe-feld" min="1" max="10"></label>
+      <label><input type="checkbox" id="zurueck-feld"> Gezogene Karten kommen zurück in den Stapel</label>
+    </div>
+    <p class="hinweis" id="zurueck-hinweis"></p>
+
+    <div class="k-karte" id="gemeinsam" hidden>
+      <div class="k-kopf"><span class="nummer">Vorderseite für alle Karten</span></div>
+      <div id="gemeinsam-feld"></div>
+    </div>
+
+    <div class="karten-editor" id="karten-editor"></div>
+    <div class="zeile"><button id="neue-karte">+ Karte</button></div>
+
+    <details class="schnell">
+      <summary>Viele Karten auf einmal anlegen</summary>
+      <p class="hinweis" id="schnell-hinweis"></p>
+      <textarea id="schnell-feld" rows="5"></textarea>
+      <div class="zeile"><button id="schnell-knopf">Als Karten hinzufügen</button></div>
+    </details>
+
+    <p class="ungespeichert" id="ungespeichert" hidden>● Noch nicht gespeichert</p>
+    <div class="zeile"><button id="speichern" class="haupt">Alles speichern</button></div>
+    <p class="hinweis">Bilder: kopieren und im Textfeld der Seite mit Cmd+V einfügen, auf das Feld ziehen oder auswählen. Ein Bild pro Seite.</p>
+  </div>
+</main>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1/+esm';
+
+// >>> Bilder werden höchstens so groß (in Pixeln) gespeichert <<<
+const MAX_BILD_PIXEL = 1000;
+// >>> Höchstzahl der Karten <<<
+const MAX_KARTEN = 60;
+
+// >>> Hier deine beiden Werte aus Teil 3 eintragen <<<
+const supabase = createClient('HIER-DEINE-PROJECT-URL', 'HIER-DEIN-KEY');
+
+const board = location.hash.slice(1) || 'karten';
+const zugBoard = board + '--karten';
+const parameter = new URLSearchParams(location.search);
+const bearbeitenModus = parameter.has('bearbeiten');
+const beamerModus = parameter.has('beamer');
+if (beamerModus) document.body.classList.add('beamer');
+const $ = id => document.getElementById(id);
+
+const LEER = { auftrag: '', modus: 'gleich', gruppen: 6, proGruppe: 1, zuruecklegen: false, vorne: '', karten: [] };
+let stapel = { ...LEER };     // gespeicherter Stapel
+let entwurf = null;            // Stapel in deiner Vorbereitung
+let bilder = {};               // gespeicherte Bilder: 'vorne', '<id>-v', '<id>-h'
+let entwurfBilder = {};
+let geaendert = false;
+const zuege = new Map();       // Gruppe (g1, g2 …) -> Liste der Karten-Nummern
+const umgedreht = new Map();   // Karte -> umgedreht?
+const neueKarten = new Set();
+let pin = null;
+let gruppe = null;
+
+// ---------- Hilfsfunktionen ----------
+function lesen(key) { try { return localStorage.getItem(key); } catch { return null; } }
+function schreiben(key, wert) { try { if (wert === null) localStorage.removeItem(key); else localStorage.setItem(key, wert); } catch {} }
+
+function zeigeFehler(text) {
+  $('fehler').textContent = 'Fehler: ' + text;
+  $('fehler').hidden = false;
+  setTimeout(() => { $('fehler').hidden = true; }, 6000);
+}
+
+function element(tag, klasse, text) {
+  const el = document.createElement(tag);
+  if (klasse) el.className = klasse;
+  if (text) el.textContent = text;
+  return el;
+}
+
+async function mitPin(aktion) {
+  if (!pin) pin = 'login';
+  if (!pin) return false;
+  const { error } = await aktion(pin);
+  if (error) { pin = null; zeigeFehler(error.message); return false; }
+  return true;
+}
+
+function speichereEintrag(fall, text) {
+  return mitPin(p => supabase.rpc('fall_speichern', { p_board: board, p_fall: fall, p_text: text, p_pin: p }));
+}
+
+function jsonLesen(text, ersatz) {
+  try { const w = JSON.parse(text || ''); return w ?? ersatz; } catch { return ersatz; }
+}
+
+const neueId = () => 'k' + Date.now().toString(36).slice(-4) + Math.random().toString(36).slice(2, 5);
+const zahl = (wert, min, max, ersatz) => Math.min(max, Math.max(min, Math.round(Number(wert)) || ersatz));
+const gruppenName = g => 'Gruppe ' + g.slice(1);
+const karteVon = id => stapel.karten.find(k => k.id === id) || null;
+
+function zugListe(text) {
+  const l = jsonLesen(text, []);
+  return Array.isArray(l) ? l : [];
+}
+
+function bildVerkleinern(datei) {
+  return new Promise((fertig, fehler) => {
+    const url = URL.createObjectURL(datei);
+    const img = new Image();
+    img.onload = () => {
+      const faktor = Math.min(1, MAX_BILD_PIXEL / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * faktor);
+      c.height = Math.round(img.height * faktor);
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      fertig(c.toDataURL('image/jpeg', 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); fehler(new Error('Das Bild konnte nicht gelesen werden.')); };
+    img.src = url;
+  });
+}
+
+// ======================================================================
+// Karten zeichnen
+// ======================================================================
+function seite(klasse, text, bild) {
+  const s = element('div', 'seite ' + klasse);
+  if (bild) s.append(Object.assign(element('img'), { src: bild, alt: '' }));
+  if (text) s.append(element('div', 'text', text));
+  if (bild && !text) s.classList.add('nur-bild');
+  return s;
+}
+
+// Vorderseite, wie sie auf dem Stapel liegt
+function vorderseite(k) {
+  if (stapel.modus === 'gleich') {
+    if (!stapel.vorne && !bilder.vorne) {
+      const m = seite('vorne muster', '');
+      m.append(element('div', 'symbol', '?'));
+      return m;
+    }
+    return seite('vorne', stapel.vorne, bilder.vorne);
+  }
+  if (!k || (!k.vorne && !bilder[k.id + '-v'])) {
+    const m = seite('vorne muster', '');
+    m.append(element('div', 'symbol', '?'));
+    return m;
+  }
+  return seite('vorne', k.vorne, bilder[k.id + '-v']);
+}
+
+function rueckseite(k) {
+  return seite('hinten', k.hinten, bilder[k.id + '-h']);
+}
+
+// Eine gezogene Karte zum Umdrehen
+function karteZeigen(k, gross) {
+  const karte = element('div', 'karte klickbar' + (gross ? ' gross' : ''));
+  const innen = element('div', 'innen');
+  innen.append(vorderseite(k), rueckseite(k));
+  karte.append(innen);
+  // Bei gleicher Vorderseite ist die Rückseite der Inhalt, also sofort aufdecken
+  const start = stapel.modus === 'gleich';
+  const aufgedeckt = umgedreht.has(k.id) ? umgedreht.get(k.id) : start;
+  if (neueKarten.has(k.id)) {
+    karte.classList.add('neu');
+    neueKarten.delete(k.id);
+    if (start) setTimeout(() => karte.classList.add('umgedreht'), 450);
+  } else if (aufgedeckt) {
+    karte.classList.add('umgedreht');
+  }
+  karte.title = 'Zum Umdrehen antippen';
+  karte.addEventListener('click', () => {
+    karte.classList.toggle('umgedreht');
+    umgedreht.set(k.id, karte.classList.contains('umgedreht'));
+  });
+  return karte;
+}
+
+function kurzname(k) {
+  const nr = stapel.karten.indexOf(k) + 1;
+  const text = (stapel.modus === 'beide' ? k.vorne || k.hinten : k.hinten || k.vorne || '').trim().replace(/\s+/g, ' ');
+  return 'Karte ' + nr + (text ? ': ' + (text.length > 30 ? text.slice(0, 30) + '…' : text) : '');
+}
+
+// ---------- Ansicht für Studierende ----------
+function zeichneSpiel() {
+  const hatKarten = stapel.karten.length > 0;
+  $('keine-karten').hidden = hatKarten || bearbeitenModus;
+  if (bearbeitenModus || beamerModus || !hatKarten) {
+    $('gruppe-waehlen').hidden = true;
+    $('spiel').hidden = true;
+    return;
+  }
+  if (gruppe && Number(gruppe.slice(1)) > stapel.gruppen) gruppe = null;
+  if (!gruppe) {
+    $('spiel').hidden = true;
+    $('gruppe-waehlen').hidden = false;
+    const knoepfe = $('gruppen-knoepfe');
+    knoepfe.replaceChildren();
+    for (let i = 1; i <= stapel.gruppen; i++) {
+      const knopf = element('button', '', 'Gruppe ' + i);
+      knopf.addEventListener('click', () => { gruppe = 'g' + i; schreiben('karten-gruppe-' + board, gruppe); zeichneSpiel(); });
+      knoepfe.append(knopf);
+    }
+    return;
+  }
+
+  $('gruppe-waehlen').hidden = true;
+  $('spiel').hidden = false;
+  $('gruppe-name').textContent = gruppenName(gruppe);
+
+  // Stapel
+  const meine = (zuege.get(gruppe) || []).map(karteVon).filter(Boolean);
+  const alleGezogen = new Set([...zuege.values()].flat());
+  const imStapel = stapel.zuruecklegen
+    ? stapel.karten.filter(k => !meine.includes(k)).length
+    : stapel.karten.filter(k => !alleGezogen.has(k.id)).length;
+  const stapelEl = $('stapel');
+  stapelEl.replaceChildren();
+  stapelEl.classList.toggle('leer', imStapel === 0);
+  for (let i = 0; i < 3; i++) {
+    const karte = element('div', 'karte');
+    const innen = element('div', 'innen');
+    innen.append(vorderseite(null));
+    karte.append(innen);
+    stapelEl.append(karte);
+  }
+  const fertig = meine.length >= stapel.proGruppe;
+  $('ziehen').disabled = fertig || imStapel === 0;
+  $('ziehen').textContent = meine.length ? '🎴 Noch eine Karte ziehen' : '🎴 Karte ziehen';
+  $('ziehen').hidden = fertig && stapel.proGruppe === 1;
+  $('rest').textContent = (stapel.zuruecklegen ? '' : imStapel + (imStapel === 1 ? ' Karte' : ' Karten') + ' im Stapel · ')
+    + 'gezogen: ' + meine.length + ' von ' + stapel.proGruppe;
+
+  const ziel = $('meine-karten');
+  ziel.replaceChildren();
+  if (!meine.length) ziel.append(element('p', 'gezogen-leer', 'Zieht eine Karte vom Stapel.'));
+  for (const k of meine) {
+    const huelle = element('div');
+    huelle.append(karteZeigen(k, true), element('div', 'karte-unter', 'Zum Umdrehen antippen'));
+    ziel.append(huelle);
+  }
+}
+
+async function ziehen() {
+  $('ziehen').disabled = true;
+  const { data, error } = await supabase.rpc('karte_ziehen', { p_board: board, p_gruppe: gruppe });
+  if (error) { zeigeFehler(error.message); zeichneSpiel(); return; }
+  const liste = zuege.get(gruppe) || [];
+  if (data && !liste.includes(data)) {
+    neueKarten.add(data);
+    zuege.set(gruppe, [...liste, data]);
+  }
+  zeichneSpiel();
+}
+
+$('ziehen').addEventListener('click', ziehen);
+$('gruppe-wechseln').addEventListener('click', () => { gruppe = null; schreiben('karten-gruppe-' + board, null); zeichneSpiel(); });
+
+// ---------- Übersicht für Lehrende und Beamer ----------
+function zeichneUebersicht() {
+  if (!bearbeitenModus && !beamerModus) return;
+  $('uebersicht-box').hidden = false;
+  $('uebersicht-knoepfe').hidden = beamerModus;
+  if (beamerModus) $('uebersicht-box').classList.remove('steuerung');
+  const ziel = $('uebersicht');
+  ziel.replaceChildren();
+  for (let i = 1; i <= stapel.gruppen; i++) {
+    const g = 'g' + i;
+    const karten = (zuege.get(g) || []).map(karteVon).filter(Boolean);
+    const box = element('div', 'gruppe-box');
+    const kopf = element('h3', '', gruppenName(g));
+    if (bearbeitenModus && !beamerModus && karten.length) {
+      const zurueck = element('button', 'klein', 'zurücklegen');
+      zurueck.addEventListener('click', () => zuruecklegen(g));
+      kopf.append(zurueck);
+    }
+    box.append(kopf);
+    if (!karten.length) box.append(element('div', 'hinweis', 'noch keine Karte'));
+    else if (beamerModus) {
+      const reihe = element('div', 'gezogen');
+      karten.forEach(k => reihe.append(karteZeigen(k, false)));
+      box.append(reihe);
+    } else karten.forEach(k => box.append(element('span', 'chip', kurzname(k))));
+    ziel.append(box);
+  }
+  if (bearbeitenModus && !beamerModus) {
+    const frei = stapel.zuruecklegen ? stapel.karten.length
+      : stapel.karten.filter(k => ![...zuege.values()].flat().includes(k.id)).length;
+    const info = element('p', 'hinweis', stapel.karten.length + ' Karten insgesamt'
+      + (stapel.zuruecklegen ? ' · Karten kommen zurück in den Stapel' : ' · noch ' + frei + ' im Stapel'));
+    info.style.gridColumn = '1 / -1';
+    ziel.append(info);
+  }
+}
+
+async function zuruecklegen(g) {
+  const frage = g ? 'Die Karten von ' + gruppenName(g) + ' zurück in den Stapel legen?'
+    : 'Alle gezogenen Karten zurück in den Stapel legen? Danach können alle Gruppen neu ziehen.';
+  if (!confirm(frage)) return;
+  if (await mitPin(p => supabase.rpc('karten_zuruecklegen', { p_board: board, p_gruppe: g || null }))) {
+    if (g) zuege.delete(g); else zuege.clear();
+    alles();
+  }
+}
+
+if (bearbeitenModus && !beamerModus) {
+  $('alle-zurueck').addEventListener('click', () => zuruecklegen(null));
+  $('beamer-knopf').addEventListener('click', () => window.open(location.pathname + '?beamer#' + board, '_blank'));
+}
+
+function alles() {
+  $('titel').textContent = beamerModus || !bearbeitenModus ? 'Kartenstapel' : 'Kartenstapel – Bearbeiten';
+  $('auftrag').textContent = stapel.auftrag || '';
+  $('auftrag').hidden = !stapel.auftrag;
+  zeichneSpiel();
+  zeichneUebersicht();
+}
+
+// ======================================================================
+// Karten vorbereiten (nur Bearbeiten-Ansicht)
+// ======================================================================
+function markiereGeaendert() {
+  geaendert = true;
+  $('ungespeichert').hidden = false;
+}
+
+function wahlKnoepfe(werte, aktuell, beiWahl) {
+  const gruppe = element('div', 'wahl');
+  for (const [wert, text] of werte) {
+    const knopf = element('button', wert === aktuell ? 'an' : '', text);
+    knopf.type = 'button';
+    knopf.addEventListener('click', () => { if (wert !== aktuell) beiWahl(wert); });
+    gruppe.append(knopf);
+  }
+  return gruppe;
+}
+
+// Ein Feld für eine Kartenseite: Text plus ein Bild
+function seitenFeld(titel, text, bildSchluessel, beiText) {
+  const feld = element('div', 'seiten-feld');
+  feld.append(element('div', 'titel', titel));
+  const eingabe = element('textarea');
+  eingabe.rows = 3;
+  eingabe.maxLength = 1500;
+  eingabe.value = text || '';
+  eingabe.placeholder = 'Text (optional, wenn ein Bild da ist)';
+  eingabe.addEventListener('input', () => { beiText(eingabe.value); markiereGeaendert(); });
+  feld.append(eingabe);
+
+  const mini = element('div', 'bild-mini');
+  const dateiwahl = element('input');
+  dateiwahl.type = 'file';
+  dateiwahl.accept = 'image/*';
+  dateiwahl.hidden = true;
+  const bildSetzen = async datei => {
+    try {
+      entwurfBilder[bildSchluessel] = await bildVerkleinern(datei);
+      markiereGeaendert();
+      zeichneEditor();
+    } catch (err) { zeigeFehler(err.message); }
+  };
+  dateiwahl.addEventListener('change', () => { if (dateiwahl.files[0]) bildSetzen(dateiwahl.files[0]); });
+  if (entwurfBilder[bildSchluessel]) {
+    mini.append(Object.assign(element('img'), { src: entwurfBilder[bildSchluessel], alt: '' }));
+    const weg = element('button', 'klein', '✕ Bild entfernen');
+    weg.addEventListener('click', () => { entwurfBilder[bildSchluessel] = ''; markiereGeaendert(); zeichneEditor(); });
+    mini.append(weg);
+  } else {
+    const waehlen = element('button', 'klein', '🖼 Bild auswählen');
+    waehlen.addEventListener('click', () => dateiwahl.click());
+    mini.append(waehlen);
+  }
+  mini.append(dateiwahl);
+  feld.append(mini);
+
+  eingabe.addEventListener('paste', e => {
+    const datei = [...(e.clipboardData ? e.clipboardData.files : [])].find(d => d.type.startsWith('image/'));
+    if (!datei) return;
+    e.preventDefault();
+    bildSetzen(datei);
+  });
+  feld.addEventListener('dragover', e => { e.preventDefault(); feld.classList.add('ziel'); });
+  feld.addEventListener('dragleave', () => feld.classList.remove('ziel'));
+  feld.addEventListener('drop', e => {
+    feld.classList.remove('ziel');
+    const datei = [...e.dataTransfer.files].find(d => d.type.startsWith('image/'));
+    if (!datei) return;
+    e.preventDefault();
+    bildSetzen(datei);
+  });
+  return feld;
+}
+
+function zeichneEditor() {
+  const e = entwurf;
+  $('auftrag-feld').value = e.auftrag;
+  $('modus-wahl').replaceChildren(wahlKnoepfe(
+    [['gleich', '🂠 Vorderseite für alle gleich'], ['beide', '🃏 Beide Seiten verschieden']], e.modus,
+    wert => { e.modus = wert; markiereGeaendert(); zeichneEditor(); }));
+  $('gruppen-feld').value = e.gruppen;
+  $('pro-gruppe-feld').value = e.proGruppe;
+  $('zurueck-feld').checked = e.zuruecklegen;
+  $('zurueck-hinweis').textContent = e.zuruecklegen
+    ? 'Mehrere Gruppen können dieselbe Karte ziehen. Eine Gruppe bekommt aber keine Karte doppelt.'
+    : 'Jede Karte wird nur einmal vergeben. Lege so viele Karten an, wie Gruppen × Karten pro Gruppe ergibt ('
+      + (e.gruppen * e.proGruppe) + ').';
+
+  $('gemeinsam').hidden = e.modus !== 'gleich';
+  $('gemeinsam-feld').replaceChildren(seitenFeld('Text und/oder Bild, z. B. ein Logo oder Foto', e.vorne, 'vorne',
+    wert => { e.vorne = wert; }));
+
+  const ziel = $('karten-editor');
+  ziel.replaceChildren();
+  if (!e.karten.length) ziel.append(element('p', 'hinweis', 'Noch keine Karten. Leg unten eine Karte an.'));
+  e.karten.forEach((k, i) => {
+    const box = element('div', 'k-karte');
+    const kopf = element('div', 'k-kopf');
+    kopf.append(element('span', 'nummer', 'Karte ' + (i + 1)));
+    const hoch = element('button', 'klein', '↑');
+    hoch.disabled = i === 0;
+    hoch.addEventListener('click', () => { [e.karten[i - 1], e.karten[i]] = [e.karten[i], e.karten[i - 1]]; markiereGeaendert(); zeichneEditor(); });
+    const runter = element('button', 'klein', '↓');
+    runter.disabled = i === e.karten.length - 1;
+    runter.addEventListener('click', () => { [e.karten[i + 1], e.karten[i]] = [e.karten[i], e.karten[i + 1]]; markiereGeaendert(); zeichneEditor(); });
+    const weg = element('button', 'klein', '✕ Löschen');
+    weg.addEventListener('click', () => {
+      if (!confirm('Karte ' + (i + 1) + ' löschen?')) return;
+      e.karten.splice(i, 1);
+      markiereGeaendert();
+      zeichneEditor();
+    });
+    kopf.append(hoch, runter, weg);
+    box.append(kopf);
+
+    const seiten = element('div', 'seiten' + (e.modus === 'gleich' ? ' eine' : ''));
+    if (e.modus === 'beide') seiten.append(seitenFeld('Vorderseite', k.vorne, k.id + '-v', wert => { k.vorne = wert; }));
+    seiten.append(seitenFeld(e.modus === 'beide' ? 'Rückseite' : 'Aufgedeckte Seite (wird gemischt)', k.hinten, k.id + '-h',
+      wert => { k.hinten = wert; }));
+    box.append(seiten);
+    ziel.append(box);
+  });
+  $('neue-karte').disabled = e.karten.length >= MAX_KARTEN;
+  $('schnell-hinweis').textContent = e.modus === 'beide'
+    ? 'Eine Karte pro Zeile, Vorder- und Rückseite durch | trennen. Beispiel: Was ist eine Hypothese? | Eine prüfbare Annahme'
+    : 'Eine Karte pro Zeile. Jede Zeile wird zur aufgedeckten Seite einer Karte.';
+}
+
+if (bearbeitenModus && !beamerModus) {
+  $('editor').hidden = false;
+  $('auftrag-feld').addEventListener('input', () => { entwurf.auftrag = $('auftrag-feld').value; markiereGeaendert(); });
+  $('gruppen-feld').addEventListener('change', () => { entwurf.gruppen = zahl($('gruppen-feld').value, 1, 12, 6); markiereGeaendert(); zeichneEditor(); });
+  $('pro-gruppe-feld').addEventListener('change', () => { entwurf.proGruppe = zahl($('pro-gruppe-feld').value, 1, 10, 1); markiereGeaendert(); zeichneEditor(); });
+  $('zurueck-feld').addEventListener('change', () => { entwurf.zuruecklegen = $('zurueck-feld').checked; markiereGeaendert(); zeichneEditor(); });
+  $('neue-karte').addEventListener('click', () => {
+    entwurf.karten.push({ id: neueId(), vorne: '', hinten: '' });
+    markiereGeaendert();
+    zeichneEditor();
+    const boxen = $('karten-editor').querySelectorAll('.k-karte');
+    const letzte = boxen[boxen.length - 1];
+    if (letzte) { letzte.scrollIntoView({ behavior: 'smooth', block: 'center' }); letzte.querySelector('textarea').focus(); }
+  });
+  $('schnell-knopf').addEventListener('click', () => {
+    const zeilen = $('schnell-feld').value.split('\n').map(z => z.trim()).filter(Boolean);
+    for (const z of zeilen) {
+      if (entwurf.karten.length >= MAX_KARTEN) { zeigeFehler('Höchstens ' + MAX_KARTEN + ' Karten.'); break; }
+      const [a, ...b] = z.split('|');
+      entwurf.karten.push(entwurf.modus === 'beide'
+        ? { id: neueId(), vorne: a.trim(), hinten: b.join('|').trim() }
+        : { id: neueId(), vorne: '', hinten: z });
+    }
+    $('schnell-feld').value = '';
+    markiereGeaendert();
+    zeichneEditor();
+  });
+  $('speichern').addEventListener('click', async () => {
+    const knopf = $('speichern');
+    knopf.disabled = true;
+    let ok = true;
+    for (const [schluessel, wert] of Object.entries(entwurfBilder)) {
+      if ((wert || '') !== (bilder[schluessel] || '')) {
+        ok = await speichereEintrag('bild-' + schluessel, wert || '');
+        if (!ok) break;
+        bilder[schluessel] = wert || '';
+      }
+    }
+    const daten = { ...entwurf, karten: entwurf.karten.map(k => ({ id: k.id, vorne: k.vorne || '', hinten: k.hinten || '' })) };
+    if (ok) ok = await speichereEintrag('stapel', JSON.stringify(daten));
+    knopf.disabled = false;
+    if (ok) {
+      stapel = daten;
+      geaendert = false;
+      $('ungespeichert').hidden = true;
+      alles();
+      knopf.textContent = 'Gespeichert ✓';
+      setTimeout(() => { knopf.textContent = 'Alles speichern'; }, 2000);
+    }
+  });
+  window.addEventListener('beforeunload', ev => { if (geaendert) { ev.preventDefault(); ev.returnValue = ''; } });
+}
+
+// ======================================================================
+// Laden und Live-Aktualisierung
+// ======================================================================
+function verarbeite(z) {
+  if (z.fall === 'stapel') {
+    stapel = { ...LEER, ...jsonLesen(z.beschreibung, {}) };
+    if (!Array.isArray(stapel.karten)) stapel.karten = [];
+    if (bearbeitenModus && !beamerModus && !geaendert) {
+      entwurf = JSON.parse(JSON.stringify(stapel));
+      entwurfBilder = { ...bilder };
+      zeichneEditor();
+    }
+    alles();
+  } else if (z.fall.startsWith('bild-')) {
+    const schluessel = z.fall.slice(5);
+    bilder[schluessel] = (z.beschreibung || '').startsWith('data:image/') ? z.beschreibung : '';
+    if (bearbeitenModus && !beamerModus && !geaendert) { entwurfBilder[schluessel] = bilder[schluessel]; zeichneEditor(); }
+    alles();
+  }
+}
+
+async function nachladen(fall) {
+  const { data, error } = await supabase.from('faelle').select('*').eq('board', board).eq('fall', fall).maybeSingle();
+  if (error) zeigeFehler(error.message);
+  else if (data) verarbeite(data);
+}
+
+gruppe = lesen('karten-gruppe-' + board);
+if (gruppe && !/^g\d{1,2}$/.test(gruppe)) gruppe = null;
+
+const [r1, r2] = await Promise.all([
+  supabase.from('faelle').select('*').eq('board', board),
+  supabase.from('stimmen').select('person, antwort').eq('board', zugBoard),
+]);
+for (const r of [r1, r2]) if (r.error) zeigeFehler(r.error.message);
+(r2.data || []).forEach(s => zuege.set(s.person, zugListe(s.antwort)));
+const zeilen = r1.data || [];
+zeilen.filter(z => z.fall.startsWith('bild-')).forEach(verarbeite);
+zeilen.filter(z => z.fall === 'stapel').forEach(verarbeite);
+if (bearbeitenModus && !beamerModus && !entwurf) {
+  entwurf = JSON.parse(JSON.stringify(LEER));
+  entwurfBilder = { ...bilder };
+  zeichneEditor();
+}
+alles();
+
+supabase.channel('karten-' + board)
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'faelle', filter: 'board=eq.' + board },
+      p => {
+        if (!p.new || !p.new.fall) return;
+        if (p.new.fall.startsWith('bild-')) nachladen(p.new.fall);
+        else verarbeite(p.new);
+      })
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'stimmen', filter: 'board=eq.' + zugBoard },
+      p => { zuege.set(p.new.person, zugListe(p.new.antwort)); alles(); })
+  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'stimmen', filter: 'board=eq.' + zugBoard },
+      p => { zuege.set(p.new.person, zugListe(p.new.antwort)); alles(); })
+  .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'stimmen' },
+      p => { if (p.old.board === zugBoard) { zuege.delete(p.old.person); alles(); } })
+  .subscribe(status => {
+    if (status === 'SUBSCRIBED') $('status').textContent = bearbeitenModus && !beamerModus
+      ? '● Live verbunden – Bearbeiten-Modus' : '● Live verbunden';
+    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') $('status').textContent = '○ Keine Live-Verbindung (siehe Teil 6)';
+  });
+</script>
+
+<footer style="text-align:center; font: .85rem system-ui, sans-serif; padding: 1.5rem 1rem; color: #555;">
+  <a href="impressum.html" style="color: inherit;">Impressum</a> ·
+  <a href="datenschutz.html" style="color: inherit;">Datenschutz</a>
+</footer>
+</body>
+</html>
