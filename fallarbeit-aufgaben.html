@@ -142,10 +142,17 @@
     <div class="gruppen-wahl" id="gruppen-knoepfe"></div>
   </div>
 
+  <!-- Studierende: Fall wählen (wenn eingestellt) -->
+  <div class="box" id="fall-waehlen" hidden>
+    <h2 id="fall-frage">Welchen Fall bearbeitet ihr?</h2>
+    <div class="gruppen-wahl" id="fall-knoepfe"></div>
+  </div>
+
   <!-- Studierende: Aufgaben bearbeiten / Lehrende: Antworten ansehen -->
   <div id="wer-kopf" hidden>
     <span id="wer-name"></span>
     <a class="leise" id="gruppe-wechseln" hidden>Gruppe wechseln</a>
+    <a class="leise" id="fall-wechseln" hidden>Anderen Fall wählen</a>
     <div id="name-zeile" hidden><input type="text" id="name-feld" maxlength="80" placeholder="Dein Name (freiwillig)"></div>
   </div>
   <p class="hinweis" id="leer-hinweis" hidden>Hier gibt es noch keine Fälle.</p>
@@ -162,6 +169,9 @@
     </div>
     <div class="einstellung" id="namen-einstellung">
       <label><input type="checkbox" id="namen-feld"> Nach dem Namen fragen (Angabe bleibt freiwillig)</label>
+    </div>
+    <div class="einstellung">
+      <label><input type="checkbox" id="fallwahl-feld"> Studierende wählen zuerst einen Fall aus und sehen dann nur diesen</label>
     </div>
     <div id="e-faelle"></div>
     <div class="zeile"><button id="neuer-fall">+ Fall</button></div>
@@ -196,7 +206,7 @@ const TYPEN = [
   ['mc', '☑️ Multiple Choice'],
   ['info', 'ℹ️ Information'],
 ];
-const LEER = { modus: 'gruppen', gruppen: 6, namen: true, faelle: [] };
+const LEER = { modus: 'gruppen', gruppen: 6, namen: true, fallwahl: false, faelle: [] };
 
 let aufbau = JSON.parse(JSON.stringify(LEER));
 let bilder = {};               // 'f-<fall>' und 'a-<aufgabe>' -> Liste von Bildern
@@ -259,6 +269,7 @@ if (!person) {
   schreiben('ideen-person', person);
 }
 const personKennung = 'p' + person.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 40).padEnd(6, '0');
+let gewaehlterFall = lesen('aufgaben-fall-' + board);
 let gruppe = lesen('aufgaben-gruppe-' + board);
 if (gruppe && !/^g\d{1,2}$/.test(gruppe)) gruppe = null;
 const wer = () => aufbau.modus === 'gruppen' ? gruppe : personKennung;
@@ -577,13 +588,43 @@ function zeichneFaelle() {
       return;
     }
   }
+  // Fall wählen (wenn eingestellt)
+  $('fall-waehlen').hidden = true;
+  const fallwahl = !lehrAnsicht && aufbau.fallwahl && aufbau.faelle.length > 1;
+  let sichtbareFaelle = aufbau.faelle;
+  if (fallwahl) {
+    if (gewaehlterFall && !aufbau.faelle.some(f => f.id === gewaehlterFall)) gewaehlterFall = null;
+    if (!gewaehlterFall) {
+      $('gruppe-waehlen').hidden = true;
+      $('wer-kopf').hidden = true;
+      $('fall-waehlen').hidden = false;
+      $('fall-frage').textContent = aufbau.modus === 'gruppen'
+        ? 'Gruppe ' + (gruppe || '').slice(1) + ': Welchen Fall bearbeitet ihr?' : 'Welchen Fall bearbeitest du?';
+      const k = $('fall-knoepfe');
+      k.replaceChildren();
+      aufbau.faelle.forEach((fall, i) => {
+        const b = element('button', '', fall.titel || 'Fall ' + (i + 1));
+        b.addEventListener('click', () => {
+          gewaehlterFall = fall.id;
+          if (ansicht !== 'vorschau') schreiben('aufgaben-fall-' + board, fall.id);
+          zeichneFaelle();
+        });
+        k.append(b);
+      });
+      return;
+    }
+    sichtbareFaelle = aufbau.faelle.filter(f => f.id === gewaehlterFall);
+  }
+  $('fall-wechseln').hidden = !fallwahl;
+
   $('gruppe-waehlen').hidden = true;
   $('wer-kopf').hidden = lehrAnsicht || !aufbau.faelle.length;
   $('wer-name').textContent = aufbau.modus === 'gruppen' ? 'Gruppe ' + (gruppe || '').slice(1) : '';
   $('gruppe-wechseln').hidden = aufbau.modus !== 'gruppen';
   $('name-zeile').hidden = !(aufbau.modus === 'einzeln' && aufbau.namen);
 
-  aufbau.faelle.forEach((fall, i) => {
+  sichtbareFaelle.forEach(fall => {
+    const i = aufbau.faelle.indexOf(fall);
     const box = element('div', 'fall');
     box.append(element('h2', '', fall.titel || 'Fall ' + (i + 1)));
     if (fall.text) box.append(element('div', 'beschreibung', fall.text));
@@ -601,6 +642,11 @@ $('gruppe-wechseln').addEventListener('click', () => {
   gruppe = null;
   if (ansicht !== 'vorschau') schreiben('aufgaben-gruppe-' + board, null);
   meine.clear();
+  zeichneFaelle();
+});
+$('fall-wechseln').addEventListener('click', () => {
+  gewaehlterFall = null;
+  if (ansicht !== 'vorschau') schreiben('aufgaben-fall-' + board, null);
   zeichneFaelle();
 });
 $('name-feld').value = lesen('aufgaben-name') || '';
@@ -681,7 +727,7 @@ async function ansichtWechseln(neu) {
     entwurfBilder = JSON.parse(JSON.stringify(bilder));
   }
   ansicht = neu;
-  if (neu === 'vorschau') { gruppe = null; meine.clear(); }
+  if (neu === 'vorschau') { gruppe = null; gewaehlterFall = null; meine.clear(); }
   if (neu === 'vorbereiten') zeichneEditor();
   zeichneSteuerung();
   zeichneFaelle();
@@ -777,6 +823,7 @@ function zeichneEditor() {
   $('namen-einstellung').hidden = e.modus !== 'einzeln';
   $('gruppen-feld').value = e.gruppen;
   $('namen-feld').checked = e.namen;
+  $('fallwahl-feld').checked = !!e.fallwahl;
 
   const ziel = $('e-faelle');
   ziel.replaceChildren();
@@ -786,21 +833,21 @@ function zeichneEditor() {
     const kopf = element('div', 'e-kopf');
     kopf.append(element('span', 'nummer', 'Fall ' + (fi + 1)), verschiebeKnoepfe(e.faelle, fi));
     const kopie = element('button', 'klein', '⧉ Fall kopieren');
-       kopie.addEventListener('click', () => {
-         const neu = JSON.parse(JSON.stringify(fall));
-         neu.id = neueId('f');
-         neu.titel = (fall.titel || 'Fall ' + (fi + 1)) + ' (Kopie)';
-         if (entwurfBilder['f-' + fall.id]) entwurfBilder['f-' + neu.id] = [...entwurfBilder['f-' + fall.id]];
-         neu.aufgaben.forEach(a => {
-           const alt = a.id;
-           a.id = neueId('a');
-           if (entwurfBilder['a-' + alt]) entwurfBilder['a-' + a.id] = [...entwurfBilder['a-' + alt]];
-         });
-         e.faelle.splice(fi + 1, 0, neu);
-         markiereGeaendert();
-         zeichneEditor();
-       });
-       kopf.append(kopie);
+    kopie.addEventListener('click', () => {
+      const neu = JSON.parse(JSON.stringify(fall));
+      neu.id = neueId('f');
+      neu.titel = (fall.titel || 'Fall ' + (fi + 1)) + ' (Kopie)';
+      if (entwurfBilder['f-' + fall.id]) entwurfBilder['f-' + neu.id] = [...entwurfBilder['f-' + fall.id]];
+      neu.aufgaben.forEach(a => {
+        const alt = a.id;
+        a.id = neueId('a');
+        if (entwurfBilder['a-' + alt]) entwurfBilder['a-' + a.id] = [...entwurfBilder['a-' + alt]];
+      });
+      e.faelle.splice(fi + 1, 0, neu);
+      markiereGeaendert();
+      zeichneEditor();
+    });
+    kopf.append(kopie);
     const weg = element('button', 'klein', '✕ Fall löschen');
     weg.addEventListener('click', () => {
       if (!confirm('Fall ' + (fi + 1) + ' mit allen Aufgaben löschen?')) return;
@@ -884,6 +931,7 @@ function zeichneEditor() {
 if (bearbeitenModus) {
   $('gruppen-feld').addEventListener('change', () => { entwurf.gruppen = zahl($('gruppen-feld').value, 1, 20, 6); markiereGeaendert(); zeichneEditor(); });
   $('namen-feld').addEventListener('change', () => { entwurf.namen = $('namen-feld').checked; markiereGeaendert(); });
+  $('fallwahl-feld').addEventListener('change', () => { entwurf.fallwahl = $('fallwahl-feld').checked; markiereGeaendert(); });
   $('neuer-fall').addEventListener('click', () => {
     entwurf.faelle.push({ id: neueId('f'), titel: 'Fall ' + (entwurf.faelle.length + 1), text: '',
       aufgaben: [{ id: neueId('a'), typ: 'text', text: '', optionen: [], mehrfach: false }] });
