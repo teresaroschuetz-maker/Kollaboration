@@ -108,6 +108,33 @@
   .bild-mini { display: flex; align-items: center; gap: .5rem; margin-top: .4rem; flex-wrap: wrap; }
   .bild-mini img { height: 70px; border-radius: 6px; border: 1px solid var(--rahmen); }
   details.schnell { margin-top: 1rem; }
+  .druck-box { margin-top: 1.4rem; padding-top: 1rem; border-top: 1px solid var(--rahmen); }
+  .druck-box h3 { margin: 0 0 .3rem; font-size: 1.05rem; }
+
+  /* Drucken: nur der Bereich #druck kommt aufs Papier */
+  #druck { display: none; }
+  .dk-blatt { display: grid; justify-content: center; align-content: start; break-after: page; page-break-after: always; }
+  .dk-blatt:last-child { break-after: auto; page-break-after: auto; }
+  .dk { width: var(--kw); height: var(--kh); box-sizing: border-box; position: relative; overflow: hidden;
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3mm;
+        padding: 5mm; text-align: center; font: var(--schrift) system-ui, sans-serif; color: #000; background: #fff; }
+  .dk.schnitt { outline: .25mm dashed #999; outline-offset: -.125mm; }
+  .dk.leer { outline: none; }
+  .dk img { max-width: 100%; max-height: 62%; object-fit: contain; }
+  .dk.nur-bild img { max-height: 100%; }
+  .dk .dk-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .dk .dk-nr { position: absolute; right: 2.5mm; bottom: 1.8mm; font-size: 6.5pt; color: #999; }
+  .dk.muster { background: repeating-linear-gradient(45deg, #7a2e63 0 3mm, #8e3d75 3mm 6mm); color: #fff;
+               -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .dk.muster .dk-text { font-size: 28pt; font-weight: 800; }
+  .dk-paar { display: flex; }
+  .dk-paar .dk + .dk { border-left: .3mm dotted #666; }
+  @media print {
+    @page { size: A4 portrait; margin: 10mm; }
+    html, body { background: #fff !important; margin: 0; }
+    body > *:not(#druck) { display: none !important; }
+    #druck { display: block; }
+  }
   details.schnell summary { cursor: pointer; font-weight: 600; }
 </style>
 </head>
@@ -185,6 +212,17 @@
     <p class="ungespeichert" id="ungespeichert" hidden>● Noch nicht gespeichert</p>
     <div class="zeile"><button id="speichern" class="haupt">Alles speichern</button></div>
     <p class="hinweis">Bilder: kopieren und im Textfeld der Seite mit Cmd+V einfügen, auf das Feld ziehen oder auswählen. Ein Bild pro Seite.</p>
+
+    <div class="druck-box">
+      <h3>🖨 Karten drucken</h3>
+      <p class="hinweis" style="margin-top:0">Für die Präsenzveranstaltung: Die Karten werden auf A4-Seiten zum Ausschneiden gesetzt.</p>
+      <div class="einstellung"><span>Größe:</span><span id="druck-groesse"></span></div>
+      <div class="einstellung"><span>Art:</span><span id="druck-art"></span></div>
+      <div class="einstellung"><label><input type="checkbox" id="druck-schnitt" checked> Schnittlinien</label>
+        <label><input type="checkbox" id="druck-nummer" checked> Kartennummer klein in die Ecke</label></div>
+      <p class="hinweis" id="druck-hinweis"></p>
+      <div class="zeile"><button class="haupt" id="drucken">🖨 Druckansicht öffnen</button></div>
+    </div>
   </div>
 </main>
 
@@ -664,6 +702,111 @@ if (bearbeitenModus && !beamerModus) {
 }
 
 // ======================================================================
+// Drucken (nur Bearbeiten-Ansicht)
+// ======================================================================
+const DRUCK_GROESSEN = {
+  klein: { w: 63, h: 88, spalten: 3, zeilen: 3, schrift: '10.5pt' },   // Spielkartenformat, 9 pro Seite
+  gross: { w: 90, h: 125, spalten: 2, zeilen: 2, schrift: '13pt' },    // 4 pro Seite
+};
+let druckGroesse = 'klein';
+let druckArt = 'beidseitig';
+
+function zeichneDruckOptionen() {
+  $('druck-groesse').replaceChildren(wahlKnoepfe(
+    [['klein', 'Klein (Spielkarte, 9 pro Seite)'], ['gross', 'Groß (4 pro Seite)']], druckGroesse,
+    wert => { druckGroesse = wert; zeichneDruckOptionen(); }));
+  $('druck-art').replaceChildren(wahlKnoepfe(
+    [['beidseitig', 'Beidseitig drucken'], ['falten', 'Zum Falten (Vorder- und Rückseite nebeneinander)'], ['einseitig', 'Nur die gemischte Seite']],
+    druckArt, wert => { druckArt = wert; zeichneDruckOptionen(); }));
+  $('druck-hinweis').textContent = druckArt === 'beidseitig'
+    ? 'Im Druckfenster „Beidseitig“ bzw. „Duplex“ wählen und an der langen Kante wenden. Vorder- und Rückseiten liegen dann genau übereinander. Am besten zuerst eine Seite testen.'
+    : druckArt === 'falten'
+    ? 'Jede Karte wird mit Vorder- und Rückseite nebeneinander gedruckt. Ausschneiden, an der gepunkteten Linie falten und eventuell zusammenkleben.'
+    : 'Es wird nur die Seite mit den unterschiedlichen Inhalten gedruckt, z. B. zum Aufkleben auf fertige Karten.';
+}
+
+function druckKarte(text, bild, nr, extra) {
+  const k = element('div', 'dk' + ($('druck-schnitt').checked ? ' schnitt' : '') + (extra ? ' ' + extra : ''));
+  if (bild) k.append(Object.assign(element('img'), { src: bild, alt: '' }));
+  const t = (text || '').trim();
+  if (t) {
+    const el = element('div', 'dk-text', t);
+    // Lange Texte etwas kleiner setzen
+    if (t.length > 350) el.style.fontSize = '75%';
+    else if (t.length > 180) el.style.fontSize = '88%';
+    k.append(el);
+  }
+  if (bild && !t) k.classList.add('nur-bild');
+  if (!bild && !t) { k.classList.add('muster'); k.append(element('div', 'dk-text', '?')); }
+  if (nr && $('druck-nummer').checked) k.append(element('span', 'dk-nr', nr));
+  return k;
+}
+
+function drucken() {
+  const d = entwurf;
+  const b = entwurfBilder;
+  if (!d.karten.length) { zeigeFehler('Es gibt noch keine Karten zum Drucken.'); return; }
+  const m = DRUCK_GROESSEN[druckGroesse];
+  const ziel = $('druck');
+  ziel.replaceChildren();
+  ziel.style.setProperty('--kw', m.w + 'mm');
+  ziel.style.setProperty('--kh', m.h + 'mm');
+  ziel.style.setProperty('--schrift', m.schrift);
+
+  const vorne = (k, i) => d.modus === 'gleich'
+    ? druckKarte(d.vorne, b.vorne, i + 1)
+    : druckKarte(k.vorne, b[k.id + '-v'], i + 1);
+  const hinten = (k, i) => druckKarte(k.hinten, b[k.id + '-h'], i + 1);
+  const leer = () => element('div', 'dk leer');
+  const blatt = spalten => {
+    const s = element('div', 'dk-blatt');
+    s.style.gridTemplateColumns = 'repeat(' + spalten + ', var(--kw))';
+    ziel.append(s);
+    return s;
+  };
+
+  if (druckArt === 'falten') {
+    // Pro Zeile ein Kartenpaar; bei "groß" passt nur eine Spalte
+    const paareProZeile = druckGroesse === 'klein' ? 1 : 1;
+    const zeilen = druckGroesse === 'klein' ? 3 : 2;
+    for (let i = 0; i < d.karten.length; i += zeilen * paareProZeile) {
+      const s = blatt(1);
+      s.style.gridTemplateColumns = 'calc(var(--kw) * 2)';
+      d.karten.slice(i, i + zeilen).forEach((k, j) => {
+        const paar = element('div', 'dk-paar');
+        paar.append(vorne(k, i + j), hinten(k, i + j));
+        s.append(paar);
+      });
+    }
+  } else {
+    const proSeite = m.spalten * m.zeilen;
+    for (let i = 0; i < d.karten.length; i += proSeite) {
+      const teil = d.karten.slice(i, i + proSeite);
+      if (druckArt === 'beidseitig') {
+        const vs = blatt(m.spalten);
+        for (let p = 0; p < proSeite; p++) vs.append(teil[p] ? vorne(teil[p], i + p) : leer());
+      }
+      // Rückseiten: jede Zeile gespiegelt, damit sie beim Wenden an der langen Kante passen
+      const rs = blatt(m.spalten);
+      for (let z = 0; z < m.zeilen; z++) {
+        for (let sp = 0; sp < m.spalten; sp++) {
+          const p = druckArt === 'beidseitig' ? z * m.spalten + (m.spalten - 1 - sp) : z * m.spalten + sp;
+          rs.append(teil[p] ? hinten(teil[p], i + p) : leer());
+        }
+      }
+    }
+  }
+  // Bilder fertig laden lassen, dann drucken
+  const bilderLaden = [...ziel.querySelectorAll('img')].map(img => img.decode ? img.decode().catch(() => {}) : null);
+  Promise.all(bilderLaden).then(() => window.print());
+}
+
+if (bearbeitenModus && !beamerModus) {
+  zeichneDruckOptionen();
+  $('drucken').addEventListener('click', drucken);
+}
+
+// ======================================================================
 // Laden und Live-Aktualisierung
 // ======================================================================
 function verarbeite(z) {
@@ -679,7 +822,7 @@ function verarbeite(z) {
   } else if (z.fall.startsWith('bild-')) {
     const schluessel = z.fall.slice(5);
     bilder[schluessel] = (z.beschreibung || '').startsWith('data:image/') ? z.beschreibung : '';
-    if (bearbeitenModus && !beamerModus && !geaendert) { entwurfBilder[schluessel] = bilder[schluessel]; zeichneEditor(); }
+    if (bearbeitenModus && !beamerModus && !geaendert && entwurf) { entwurfBilder[schluessel] = bilder[schluessel]; zeichneEditor(); }
     alles();
   }
 }
@@ -728,6 +871,8 @@ supabase.channel('karten-' + board)
     else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') $('status').textContent = '○ Keine Live-Verbindung (siehe Teil 6)';
   });
 </script>
+
+<div id="druck"></div>
 
 <footer style="text-align:center; font: .85rem system-ui, sans-serif; padding: 1.5rem 1rem; color: #555;">
   <a href="impressum.html" style="color: inherit;">Impressum</a> ·
