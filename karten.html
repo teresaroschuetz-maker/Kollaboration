@@ -851,7 +851,7 @@ async function nachladen(fall) {
   else if (data) verarbeite(data);
 }
 
-gruppe = lesen('karten-gruppe-' + board);
+gruppe = null;
 if (gruppe && !/^g\d{1,2}$/.test(gruppe)) gruppe = null;
 
 const [r1, r2] = await Promise.all([
