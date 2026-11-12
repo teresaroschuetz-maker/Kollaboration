@@ -35,15 +35,18 @@
   button:disabled { opacity: .45; cursor: default; }
   .hinweis { text-align: center; font-size: .9rem; color: var(--leise); margin: .6rem 0 0; }
   #wolke { background: var(--flaeche); border: 1px solid var(--rahmen); border-radius: 18px; min-height: 320px;
-           padding: 2rem 1.5rem; display: flex; flex-wrap: wrap; justify-content: center;
-           align-items: center; align-content: center; gap: .4rem 1.1rem; }
-  .wort { font-weight: 700; line-height: 1.1; overflow-wrap: anywhere; cursor: default; }
+           position: relative; overflow: hidden; }
+  #wolke .leer-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .wort { position: absolute; font-weight: 700; line-height: 1; white-space: nowrap; cursor: default;
+          transition: left .6s ease, top .6s ease; }
+  .wort-mass { position: absolute; visibility: hidden; font-weight: 700; line-height: 1; white-space: nowrap; }
   .wort.neu { animation: auftauchen .6s ease-out; }
   @keyframes auftauchen { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: scale(1); } }
   .leer-text { color: var(--leise); font-style: italic; }
   #anzahl { text-align: center; color: var(--leise); font-size: .9rem; margin-top: .6rem; }
   body.beamer .eingabe-box { display: none; }
   body.beamer #frage { font-size: 2.4rem; }
+  [hidden] { display: none !important; }
 </style>
 </head>
 <body>
@@ -142,25 +145,106 @@ function zeichne() {
   const sortiert = [...gruppen.values()].sort((a, b) => b.anzahl - a.anzahl || a.key.localeCompare(b.key));
   const max = sortiert.length ? sortiert[0].anzahl : 1;
 
-  // Die häufigsten Begriffe in die Mitte, die selteneren nach außen
-  const anordnung = [];
-  sortiert.forEach((g, i) => { if (i % 2 === 0) anordnung.push(g); else anordnung.unshift(g); });
-
   const wolke = $('wolke');
-  wolke.replaceChildren();
-  if (!anordnung.length) wolke.append(element('span', 'leer-text', 'Noch keine Begriffe.'));
-  for (const g of anordnung) {
-    const span = element('span', 'wort', g.text);
-    const groesse = max > 1 ? 1 + 3.5 * (g.anzahl - 1) / (max - 1) : 1.6;
-    span.style.fontSize = groesse.toFixed(2) + 'rem';
-    span.style.color = farbeVon(g.key);
-    span.title = g.anzahl + '× genannt';
-    if (!bekannt.has(g.key)) span.classList.add('neu');
-    wolke.append(span);
+  $('anzahl').textContent = eintraege.size + (eintraege.size === 1 ? ' Beitrag' : ' Beiträge');
+  if (!sortiert.length) {
+    wolke.replaceChildren(element('span', 'leer-text', 'Noch keine Begriffe.'));
+    wortElemente.clear();
+    wolke.style.height = '';
+    bekannt = new Set();
+    return;
+  }
+  const leer = wolke.querySelector('.leer-text');
+  if (leer) leer.remove();
+
+  // Wörter, die es nicht mehr gibt, entfernen; neue anlegen
+  for (const [k, el] of wortElemente) if (!gruppen.has(k)) { el.remove(); wortElemente.delete(k); }
+  for (const g of sortiert) {
+    let el = wortElemente.get(g.key);
+    if (!el) {
+      el = element('span', 'wort');
+      el.style.color = farbeVon(g.key);
+      if (bekannt.size && !bekannt.has(g.key)) el.classList.add('neu');
+      wolke.append(el);
+      wortElemente.set(g.key, el);
+    }
+    el.textContent = g.text;
+    el.title = g.anzahl + '× genannt';
   }
   bekannt = new Set(gruppen.keys());
-  $('anzahl').textContent = eintraege.size + (eintraege.size === 1 ? ' Beitrag' : ' Beiträge');
+  anordnen(sortiert, max);
 }
+
+// ---------- Wörter wie eine Wolke anordnen ----------
+// Das häufigste Wort kommt in die Mitte, die anderen werden auf einer Spirale nach außen
+// so platziert, dass sie sich nicht überlappen. Passt nicht alles hinein, wird alles kleiner.
+const wortElemente = new Map();
+
+function streuung(text) {
+  let h = 7;
+  for (const c of text) h = (h * 131 + c.codePointAt(0)) % 100003;
+  return (h % 628) / 100;
+}
+
+function platzieren(sortiert, max, B, H, faktor, mass) {
+  const plaetze = [];
+  const belegt = [];
+  const dx = B / H;
+  for (const g of sortiert) {
+    const rem = (max > 1 ? 1 + 3.5 * (g.anzahl - 1) / (max - 1) : 1.6) * faktor;
+    mass.style.fontSize = rem + 'rem';
+    mass.textContent = g.text;
+    const w = mass.offsetWidth + 10;
+    const h = mass.offsetHeight + 6;
+    if (w > B - 8 || h > H - 8) return null;
+    const start = streuung(g.key);
+    let gefunden = null;
+    for (let t = 0, r = 0; r < Math.max(B, H); ) {
+      const x = B / 2 + r * Math.cos(t + start) * dx * 0.75 - w / 2;
+      const y = H / 2 + r * Math.sin(t + start) * 0.75 - h / 2;
+      if (x >= 4 && y >= 4 && x + w <= B - 4 && y + h <= H - 4
+          && !belegt.some(q => x < q.x + q.w && x + w > q.x && y < q.y + q.h && y + h > q.y)) {
+        gefunden = { x, y, w, h };
+        break;
+      }
+      t += 4 / Math.max(r, 4);
+      r = 2.2 * t;
+    }
+    if (!gefunden) return null;
+    belegt.push(gefunden);
+    plaetze.push({ key: g.key, rem, x: gefunden.x + 5, y: gefunden.y + 3 });
+  }
+  return plaetze;
+}
+
+function anordnen(sortiert, max) {
+  const wolke = $('wolke');
+  const B = wolke.clientWidth || 600;
+  const H = document.body.classList.contains('beamer')
+    ? Math.max(360, Math.round(window.innerHeight - wolke.getBoundingClientRect().top - 90))
+    : Math.max(320, Math.round(B * 0.6));
+  wolke.style.height = H + 'px';
+  const mass = element('span', 'wort-mass');
+  wolke.append(mass);
+  let faktor = 1;
+  let plaetze = null;
+  for (let versuch = 0; versuch < 15 && !plaetze; versuch++) {
+    plaetze = platzieren(sortiert, max, B, H, faktor, mass);
+    faktor *= 0.88;
+  }
+  mass.remove();
+  if (!plaetze) return;
+  for (const p of plaetze) {
+    const el = wortElemente.get(p.key);
+    el.style.fontSize = p.rem.toFixed(2) + 'rem';
+    el.style.left = Math.round(p.x) + 'px';
+    el.style.top = Math.round(p.y) + 'px';
+  }
+}
+
+// Bei geänderter Fenstergröße neu anordnen
+let groesseTimer = null;
+window.addEventListener('resize', () => { clearTimeout(groesseTimer); groesseTimer = setTimeout(zeichne, 200); });
 
 // ---------- Begriff senden ----------
 async function senden() {
