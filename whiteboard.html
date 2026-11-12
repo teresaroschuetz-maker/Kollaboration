@@ -55,6 +55,21 @@
             box-shadow: 0 4px 10px rgba(0,0,0,.15); font-size: .95rem; color: #1d1d1d;
             white-space: pre-wrap; overflow-wrap: anywhere; }
   .bild-objekt { padding: 4px; background: #fff; border-radius: 6px; box-shadow: 0 4px 10px rgba(0,0,0,.15); box-sizing: border-box; }
+  .sticker { line-height: 0; filter: drop-shadow(0 2px 3px rgba(0,0,0,.25)); }
+  .sticker svg { width: 100%; height: 100%; display: block; pointer-events: none; }
+  #flaeche.sticker-modus { cursor: copy; }
+  #flaeche.sticker-modus .objekt { pointer-events: none; }
+  .sticker-wahl { width: 2.1rem; height: 2.1rem; padding: .2rem; border-radius: 8px; line-height: 0; }
+  .sticker-wahl svg { width: 100%; height: 100%; pointer-events: none; }
+  .sticker-wahl.aktiv { outline: 3px solid var(--akzent); outline-offset: 1px; background: var(--akzent-hell); }
+  .groesse-wahl { padding: .25rem .6rem; font-size: .85rem; }
+  #sticker-knopf svg { width: 1.2rem; height: 1.2rem; vertical-align: -.25rem; margin-right: .25rem; }
+  #sticker-panel { position: absolute; top: calc(100% + 6px); left: .7rem; z-index: 20; background: var(--flaeche);
+                   border: 1px solid var(--rahmen); border-radius: 14px; box-shadow: 0 10px 28px rgba(0,0,0,.18);
+                   padding: .8rem; display: grid; gap: .6rem; max-width: min(420px, calc(100vw - 3rem)); }
+  #sticker-panel .reihe { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
+  #sticker-panel .titel { font-size: .8rem; font-weight: 600; color: var(--leise); }
+  #sticker-panel .sticker-wahl { width: 2.6rem; height: 2.6rem; }
   .bild-objekt img { display: block; width: 100%; height: auto; border-radius: 4px; pointer-events: none; }
   body:not(.lehrend) .objekt.gesperrt::after { content: '🔒'; position: absolute; top: -10px; right: -8px; font-size: .85rem; }
   .schloss, .weg-knopf { position: absolute; top: -12px; width: 30px; height: 30px; padding: 0;
@@ -92,6 +107,8 @@
     <button data-modus="zeigen">✋ Verschieben</button>
     <button data-modus="stift">✏️ Stift</button>
     <button data-modus="zettel">🗒️ Zettel</button>
+    <button data-modus="sticker" id="sticker-knopf">⭐ Sticker ▾</button>
+    <div id="sticker-panel" hidden></div>
     <button id="bild-knopf">🖼️ Bild</button>
     <input type="file" id="bild-datei" accept="image/*" multiple hidden>
     <span class="trenner"></span>
@@ -114,6 +131,32 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const STIFTFARBEN  = ['#1d1d1d', '#1d5fa8', '#b3261e', '#1f7a3d', '#8a4b00', '#6a1b9a'];
 const ZETTELFARBEN = ['#fff59d', '#c8f0c8', '#c9e4ff', '#ffb3b0', '#ffe0b2', '#e1d5ff', '#f9c6f0', '#e6e6e6'];
 
+// >>> Sticker: Farben für den farbigen Punkt und Größen (in Pixeln) <<<
+const STICKERFARBEN = ['#e53935', '#fb8c00', '#fdd835', '#43a047', '#1e88e5', '#8e24aa', '#212121'];
+const STICKERGROESSEN = [['S', 60], ['M', 90], ['L', 130]];
+
+function pfeilSvg(farbe, drehung) {
+  return '<g transform="rotate(' + drehung + ' 50 50)"><path d="M8 40 L58 40 L58 18 L94 50 L58 82 L58 60 L8 60 Z" fill="' + farbe
+    + '" stroke="rgba(0,0,0,.15)" stroke-width="3" stroke-linejoin="round"/></g>';
+}
+
+// Aussehen der Sticker (gezeichnet, damit sie auf allen Geräten gleich aussehen)
+const STICKER = {
+  stern:  { name: 'Stern', svg: () => '<polygon points="50,6 62,38 96,38 68,58 79,92 50,72 21,92 32,58 4,38 38,38" fill="#fdd835" stroke="#f9a825" stroke-width="4" stroke-linejoin="round"/>' },
+  haken:  { name: 'Grünes Häkchen', svg: () => '<circle cx="50" cy="50" r="44" fill="#43a047"/><path d="M28 52 L44 68 L74 34" fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>' },
+  kreuz:  { name: 'Rotes X', svg: () => '<circle cx="50" cy="50" r="44" fill="#e53935"/><path d="M33 33 L67 67 M67 33 L33 67" stroke="#fff" stroke-width="11" stroke-linecap="round"/>' },
+  punkt:  { name: 'Farbiger Punkt', farbig: true, svg: f => '<circle cx="50" cy="50" r="40" fill="' + f + '" stroke="rgba(0,0,0,.15)" stroke-width="3"/>' },
+  herz:   { name: 'Herz', svg: () => '<path d="M50 88 C20 66 6 50 6 32 C6 18 17 8 30 8 C40 8 46 14 50 22 C54 14 60 8 70 8 C83 8 94 18 94 32 C94 50 80 66 50 88 Z" fill="#e53935"/>' },
+  frage:  { name: 'Fragezeichen', svg: () => '<circle cx="50" cy="50" r="44" fill="#1e88e5"/><path d="M37 38 C37 27 44 22 51 22 C60 22 65 28 65 35 C65 44 52 46 52 57" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round"/><circle cx="52" cy="73" r="6" fill="#fff"/>' },
+  ausruf: { name: 'Ausrufezeichen', svg: () => '<path d="M50 8 L94 88 L6 88 Z" fill="#fb8c00" stroke="#fb8c00" stroke-width="6" stroke-linejoin="round"/><path d="M50 34 L50 60" stroke="#fff" stroke-width="10" stroke-linecap="round"/><circle cx="50" cy="74" r="6" fill="#fff"/>' },
+  smiley: { name: 'Smiley', svg: () => '<circle cx="50" cy="50" r="44" fill="#fdd835" stroke="#f9a825" stroke-width="4"/><circle cx="36" cy="40" r="6" fill="#3e2723"/><circle cx="64" cy="40" r="6" fill="#3e2723"/><path d="M30 60 C38 74 62 74 70 60" fill="none" stroke="#3e2723" stroke-width="7" stroke-linecap="round"/>' },
+  'pfeil-r': { name: 'Pfeil nach rechts', farbig: true, svg: f => pfeilSvg(f, 0) },
+  'pfeil-u': { name: 'Pfeil nach unten', farbig: true, svg: f => pfeilSvg(f, 90) },
+  'pfeil-l': { name: 'Pfeil nach links', farbig: true, svg: f => pfeilSvg(f, 180) },
+  'pfeil-o': { name: 'Pfeil nach oben', farbig: true, svg: f => pfeilSvg(f, 270) },
+  daumen: { name: 'Daumen hoch', svg: () => '<circle cx="50" cy="50" r="44" fill="#fdd835"/><path d="M30 48 L40 48 L40 76 L30 76 Z M44 76 L44 48 L54 26 C58 22 64 25 63 31 L60 44 L73 44 C78 44 81 48 80 53 L76 70 C75 74 72 76 68 76 Z" fill="#5d4037"/>' },
+};
+
 // >>> Bilder: Breite auf der Tafel und gespeicherte Größe (in Pixeln) <<<
 const BILD_BREITE = 360;
 const MAX_BILD_PIXEL = 1200;
@@ -133,6 +176,14 @@ const objekte = new Map();   // Nummer -> { el, typ, gesperrt, zieht, schloss, w
 let modus = 'zeigen';
 let stiftFarbe = STIFTFARBEN[0];
 let zettelFarbe = ZETTELFARBEN[0];
+let stickerArt = 'stern';
+let stickerFarbe = STICKERFARBEN[0];
+let stickerGroesse = 90;
+
+function stickerSvg(art, farbe) {
+  const s = STICKER[art] || STICKER.stern;
+  return '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' + s.svg(farbe || STICKERFARBEN[0]) + '</svg>';
+}
 let aktuellerStrich = null;
 let pin = null;
 
@@ -219,6 +270,7 @@ const HINWEISE = {
   zeigen: 'Zettel und Bilder verschieben, eigene Zettel per Doppelklick bearbeiten. Bilder mit Cmd+V einfügen.',
   stift:  'Auf die Fläche zeichnen.',
   zettel: 'Auf die Fläche tippen, wo der Zettel hin soll.',
+  sticker: 'Auf die Fläche tippen, um den Sticker zu setzen. Anderen Sticker: oben auf „Sticker“ klicken.',
 };
 
 function setzeModus(m) {
@@ -226,6 +278,7 @@ function setzeModus(m) {
   for (const b of document.querySelectorAll('[data-modus]')) b.classList.toggle('aktiv', b.dataset.modus === m);
   flaeche.classList.toggle('stift', m === 'stift');
   flaeche.classList.toggle('zettel-modus', m === 'zettel');
+  flaeche.classList.toggle('sticker-modus', m === 'sticker');
   $('modus-hinweis').textContent = HINWEISE[m];
   baueFarben();
 }
@@ -234,6 +287,7 @@ function baueFarben() {
   const box = $('farben');
   box.replaceChildren();
   if (modus === 'zeigen') return;
+  if (modus === 'sticker') return;
   const liste = modus === 'stift' ? STIFTFARBEN : ZETTELFARBEN;
   const aktuell = modus === 'stift' ? stiftFarbe : zettelFarbe;
   for (const f of liste) {
@@ -249,8 +303,72 @@ function baueFarben() {
 }
 
 for (const b of document.querySelectorAll('[data-modus]')) {
-  b.addEventListener('click', () => setzeModus(b.dataset.modus));
+  b.addEventListener('click', () => {
+    const war = modus;
+    setzeModus(b.dataset.modus);
+    if (b.dataset.modus === 'sticker') stickerAuswahl(war !== 'sticker' || $('sticker-panel').hidden);
+    else stickerAuswahl(false);
+  });
 }
+
+// ---------- Stickerauswahl (klappt erst beim Klick auf "Sticker" auf) ----------
+function stickerAuswahl(offen) {
+  const panel = $('sticker-panel');
+  panel.hidden = !offen;
+  if (!offen) return;
+  panel.replaceChildren();
+  const reihe = titel => {
+    panel.append(element('div', 'titel', titel));
+    const r = element('div', 'reihe');
+    panel.append(r);
+    return r;
+  };
+  const arten = reihe('Sticker');
+  for (const [art, st] of Object.entries(STICKER)) {
+    const b = element('button', 'sticker-wahl' + (art === stickerArt ? ' aktiv' : ''));
+    b.innerHTML = stickerSvg(art, stickerFarbe);
+    b.title = st.name;
+    b.setAttribute('aria-label', st.name);
+    b.addEventListener('click', () => {
+      stickerArt = art;
+      zeigeStickerKnopf();
+      // Bei farbigen Stickern offen lassen, damit man noch die Farbe wählen kann
+      if (st.farbig) stickerAuswahl(true); else stickerAuswahl(false);
+    });
+    arten.append(b);
+  }
+  if (STICKER[stickerArt].farbig) {
+    const farben = reihe('Farbe');
+    for (const f of STICKERFARBEN) {
+      const b = element('button', 'farbe' + (f === stickerFarbe ? ' aktiv' : ''));
+      b.style.background = f;
+      b.setAttribute('aria-label', 'Farbe ' + f);
+      b.addEventListener('click', () => { stickerFarbe = f; zeigeStickerKnopf(); stickerAuswahl(false); });
+      farben.append(b);
+    }
+  }
+  const groessen = reihe('Größe');
+  for (const [name, px] of STICKERGROESSEN) {
+    const b = element('button', 'groesse-wahl' + (px === stickerGroesse ? ' aktiv' : ''), name);
+    b.addEventListener('click', () => { stickerGroesse = px; stickerAuswahl(true); });
+    groessen.append(b);
+  }
+}
+
+function zeigeStickerKnopf() {
+  $('sticker-knopf').innerHTML = stickerSvg(stickerArt, stickerFarbe) + 'Sticker ▾';
+  $('sticker-knopf').title = STICKER[stickerArt].name + ' – zum Ändern klicken';
+}
+
+// Klick außerhalb schließt die Auswahl (ohne dabei gleich einen Sticker zu setzen)
+let schliessKlick = false;
+document.addEventListener('pointerdown', e => {
+  const panel = $('sticker-panel');
+  if (!panel.hidden && !panel.contains(e.target) && !$('sticker-knopf').contains(e.target)) {
+    stickerAuswahl(false);
+    schliessKlick = flaeche.contains(e.target);
+  }
+});
 
 // ---------- Objekte anzeigen ----------
 function pfadText(punkte) {
@@ -297,7 +415,7 @@ function wegKnopfHinzufuegen(o, id) {
   knopf.addEventListener('pointerdown', e => e.stopPropagation());
   knopf.addEventListener('click', async e => {
     e.stopPropagation();
-    if (!confirm(o.typ === 'bild' ? 'Dieses Bild löschen?' : 'Diesen Zettel löschen?')) return;
+    if (!confirm(o.typ === 'bild' ? 'Dieses Bild löschen?' : o.typ === 'sticker' ? 'Diesen Sticker löschen?' : 'Diesen Zettel löschen?')) return;
     const ok = bearbeitenModus ? await pinLoeschen(id) : await eigenesLoeschen(id);
     if (ok) objektEntfernen(id);
   });
@@ -333,6 +451,13 @@ function zeigeObjekt(z) {
       el.append(img);
       el.style.width = (z.breite || BILD_BREITE) + 'px';
       el.addEventListener('dblclick', () => zeigeGross(z.bild));
+    } else if (z.typ === 'sticker') {
+      el = element('div', 'objekt sticker');
+      el.innerHTML = stickerSvg(z.text, z.farbe);
+      el.title = (STICKER[z.text] || STICKER.stern).name;
+      const g = z.breite || 90;
+      el.style.width = g + 'px';
+      el.style.height = g + 'px';
     } else {
       el = element('div', 'objekt zettel');
       textEl = element('span', '', z.text || '');
@@ -430,6 +555,23 @@ flaeche.addEventListener('click', async e => {
   const { data, error } = await supabase.from('whiteboard').insert({
     board, typ: 'zettel', farbe: zettelFarbe, text: text.trim().slice(0, 300),
     x: Math.max(0, x - 85), y: Math.max(0, y - 30), loesch_hash: k ? k.hash : null,
+  }).select().single();
+  if (error) { zeigeFehler(error.message); return; }
+  zeigeObjekt(data);
+  merkeEigenes(data.id, k);
+});
+
+// ---------- Sticker anlegen ----------
+flaeche.addEventListener('click', async e => {
+  if (modus !== 'sticker') return;
+  if (schliessKlick) { schliessKlick = false; return; }
+  const [x, y] = punktVon(e);
+  const g = stickerGroesse;
+  const k = await neuerSchluessel();
+  const { data, error } = await supabase.from('whiteboard').insert({
+    board, typ: 'sticker', text: stickerArt, farbe: STICKER[stickerArt].farbig ? stickerFarbe : '#000000', breite: g,
+    x: Math.max(0, Math.min(2400 - g, x - g / 2)), y: Math.max(0, Math.min(1600 - g, y - g / 2)),
+    loesch_hash: k ? k.hash : null,
   }).select().single();
   if (error) { zeigeFehler(error.message); return; }
   zeigeObjekt(data);
@@ -581,6 +723,7 @@ if (bearbeitenModus) {
 
 // ---------- Laden ----------
 setzeModus('zeigen');
+zeigeStickerKnopf();
 const [r1, r2] = await Promise.all([
   supabase.from('whiteboard').select('*').eq('board', board).order('created_at'),
   supabase.from('faelle').select('*').eq('board', board).eq('fall', 'frage'),
