@@ -64,11 +64,26 @@
   .sticker-wahl.aktiv { outline: 3px solid var(--akzent); outline-offset: 1px; background: var(--akzent-hell); }
   .groesse-wahl { padding: .25rem .6rem; font-size: .85rem; }
   #sticker-knopf svg { width: 1.2rem; height: 1.2rem; vertical-align: -.25rem; margin-right: .25rem; }
-  #sticker-panel { position: absolute; top: calc(100% + 6px); left: .7rem; z-index: 20; background: var(--flaeche);
+  #formen-knopf svg { width: 1.2rem; height: 1.1rem; vertical-align: -.2rem; margin-right: .25rem; }
+  #flaeche.form-modus { cursor: copy; }
+  #flaeche.form-modus .objekt { pointer-events: none; }
+  .form-objekt { box-sizing: border-box; display: flex; align-items: center; justify-content: center; text-align: center;
+                 font-size: .95rem; color: #1d1d1d; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .form-objekt svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+  .form-objekt .form-text { position: relative; padding: 8% 14%; max-height: 100%; overflow: hidden; }
+  .form-objekt.dreieck .form-text { padding-top: 30%; }
+  .griff { position: absolute; right: -9px; bottom: -9px; width: 18px; height: 18px; padding: 0; z-index: 4;
+           background: #fff; border: 2px solid var(--akzent); border-radius: 4px; cursor: nwse-resize; touch-action: none; }
+  body:not(.lehrend) .objekt.gesperrt .griff { display: none; }
+  #formen-panel .form-wahl { width: 2.8rem; height: 2.3rem; padding: .25rem; border-radius: 8px; line-height: 0; }
+  #formen-panel .form-wahl svg { width: 100%; height: 100%; pointer-events: none; }
+  #formen-panel .form-wahl.aktiv { outline: 3px solid var(--akzent); outline-offset: 1px; background: var(--akzent-hell); }
+  #formen-panel .farbe.ohne { background: repeating-linear-gradient(45deg, #fff 0 4px, #ddd 4px 8px) !important; }
+  #sticker-panel, #formen-panel { position: absolute; top: calc(100% + 6px); left: .7rem; z-index: 20; background: var(--flaeche);
                    border: 1px solid var(--rahmen); border-radius: 14px; box-shadow: 0 10px 28px rgba(0,0,0,.18);
                    padding: .8rem; display: grid; gap: .6rem; max-width: min(420px, calc(100vw - 3rem)); }
-  #sticker-panel .reihe { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
-  #sticker-panel .titel { font-size: .8rem; font-weight: 600; color: var(--leise); }
+  #sticker-panel .reihe, #formen-panel .reihe { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
+  #sticker-panel .titel, #formen-panel .titel { font-size: .8rem; font-weight: 600; color: var(--leise); }
   #sticker-panel .sticker-wahl { width: 2.6rem; height: 2.6rem; }
   .bild-objekt img { display: block; width: 100%; height: auto; border-radius: 4px; pointer-events: none; }
   body:not(.lehrend) .objekt.gesperrt::after { content: '🔒'; position: absolute; top: -10px; right: -8px; font-size: .85rem; }
@@ -109,6 +124,8 @@
     <button data-modus="zettel">🗒️ Zettel</button>
     <button data-modus="sticker" id="sticker-knopf">⭐ Sticker ▾</button>
     <div id="sticker-panel" hidden></div>
+    <button data-modus="form" id="formen-knopf">Formen ▾</button>
+    <div id="formen-panel" hidden></div>
     <button id="bild-knopf">🖼️ Bild</button>
     <input type="file" id="bild-datei" accept="image/*" multiple hidden>
     <span class="trenner"></span>
@@ -156,6 +173,36 @@ const STICKER = {
   'pfeil-o': { name: 'Pfeil nach oben', farbig: true, svg: f => pfeilSvg(f, 270) },
   daumen: { name: 'Daumen hoch', svg: () => '<circle cx="50" cy="50" r="44" fill="#fdd835"/><path d="M30 48 L40 48 L40 76 L30 76 Z M44 76 L44 48 L54 26 C58 22 64 25 63 31 L60 44 L73 44 C78 44 81 48 80 53 L76 70 C75 74 72 76 68 76 Z" fill="#5d4037"/>' },
 };
+
+// >>> Formen: Füllfarben ('none' = nur Rahmen) <<<
+const FORMFARBEN = ['#fff59d', '#c8f0c8', '#c9e4ff', '#ffb3b0', '#ffe0b2', '#e1d5ff', '#ffffff', 'none'];
+const FORMEN = {
+  rechteck:   { name: 'Rechteck', b: 170, h: 110, svg: '<rect x="1.5" y="1.5" width="97" height="97"/>' },
+  abgerundet: { name: 'Abgerundetes Rechteck', b: 170, h: 110, svg: '<rect x="1.5" y="1.5" width="97" height="97" rx="14" ry="20"/>' },
+  ellipse:    { name: 'Kreis / Ellipse', b: 130, h: 130, svg: '<ellipse cx="50" cy="50" rx="48.5" ry="48.5"/>' },
+  dreieck:    { name: 'Dreieck', b: 150, h: 130, svg: '<polygon points="50,1.5 98.5,98.5 1.5,98.5"/>' },
+  raute:      { name: 'Raute', b: 160, h: 120, svg: '<polygon points="50,1.5 98.5,50 50,98.5 1.5,50"/>' },
+  sprechblase:{ name: 'Sprechblase', b: 180, h: 120, svg: '<path d="M8 2 H92 Q98 2 98 8 V70 Q98 76 92 76 H40 L22 98 L26 76 H8 Q2 76 2 70 V8 Q2 2 8 2 Z"/>' },
+};
+
+function formSvg(f, farbe) {
+  const form = FORMEN[f] || FORMEN.rechteck;
+  const fuellung = farbe === 'none' ? 'none' : farbe;
+  return '<svg viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+    + '<g fill="' + fuellung + '" stroke="' + (farbe === 'none' ? '#1d1d1d' : 'rgba(0,0,0,.45)') + '" stroke-width="2.5"'
+    + ' vector-effect="non-scaling-stroke" stroke-linejoin="round">'
+    + form.svg.replace(/\/>/g, ' vector-effect="non-scaling-stroke"/>') + '</g></svg>';
+}
+
+function formDaten(text) {
+  try {
+    const d = JSON.parse(text || '{}');
+    return { f: FORMEN[d.f] ? d.f : 'rechteck', h: Math.max(40, Math.min(1200, Number(d.h) || 110)), t: typeof d.t === 'string' ? d.t : '' };
+  } catch { return { f: 'rechteck', h: 110, t: '' }; }
+}
+
+let formArt = 'rechteck';
+let formFarbe = FORMFARBEN[2];
 
 // >>> Bilder: Breite auf der Tafel und gespeicherte Größe (in Pixeln) <<<
 const BILD_BREITE = 360;
@@ -237,7 +284,7 @@ function merkeEigenes(id, k) {
   eigene['whiteboard:' + id] = { s: k.schluessel, b: board, t: Date.now() };
   eigeneSpeichern();
   const o = objekte.get(id);
-  if (o) wegKnopfHinzufuegen(o, id);
+  if (o) { wegKnopfHinzufuegen(o, id); griffHinzufuegen(o, id); }
 }
 
 const schluesselVon = id => (eigene['whiteboard:' + id] || {}).s || null;
@@ -267,10 +314,11 @@ function pinLoeschen(id) {
 
 // ---------- Werkzeuge ----------
 const HINWEISE = {
-  zeigen: 'Zettel und Bilder verschieben, eigene Zettel per Doppelklick bearbeiten. Bilder mit Cmd+V einfügen.',
+  zeigen: 'Verschieben. Eigene Zettel und Formen per Doppelklick bearbeiten, eigene Bilder, Sticker und Formen am Griff ◢ unten rechts vergrößern. Bilder mit Cmd+V einfügen.',
   stift:  'Auf die Fläche zeichnen.',
   zettel: 'Auf die Fläche tippen, wo der Zettel hin soll.',
   sticker: 'Auf die Fläche tippen, um den Sticker zu setzen. Anderen Sticker: oben auf „Sticker“ klicken.',
+  form: 'Auf die Fläche tippen, um die Form zu setzen. Größe danach am Griff unten rechts ändern.',
 };
 
 function setzeModus(m) {
@@ -279,6 +327,7 @@ function setzeModus(m) {
   flaeche.classList.toggle('stift', m === 'stift');
   flaeche.classList.toggle('zettel-modus', m === 'zettel');
   flaeche.classList.toggle('sticker-modus', m === 'sticker');
+  flaeche.classList.toggle('form-modus', m === 'form');
   $('modus-hinweis').textContent = HINWEISE[m];
   baueFarben();
 }
@@ -287,7 +336,7 @@ function baueFarben() {
   const box = $('farben');
   box.replaceChildren();
   if (modus === 'zeigen') return;
-  if (modus === 'sticker') return;
+  if (modus === 'sticker' || modus === 'form') return;
   const liste = modus === 'stift' ? STIFTFARBEN : ZETTELFARBEN;
   const aktuell = modus === 'stift' ? stiftFarbe : zettelFarbe;
   for (const f of liste) {
@@ -308,6 +357,8 @@ for (const b of document.querySelectorAll('[data-modus]')) {
     setzeModus(b.dataset.modus);
     if (b.dataset.modus === 'sticker') stickerAuswahl(war !== 'sticker' || $('sticker-panel').hidden);
     else stickerAuswahl(false);
+    if (b.dataset.modus === 'form') formAuswahl(war !== 'form' || $('formen-panel').hidden);
+    else formAuswahl(false);
   });
 }
 
@@ -355,6 +406,40 @@ function stickerAuswahl(offen) {
   }
 }
 
+// ---------- Formenauswahl (klappt erst beim Klick auf "Formen" auf) ----------
+function formAuswahl(offen) {
+  const panel = $('formen-panel');
+  panel.hidden = !offen;
+  if (!offen) return;
+  panel.replaceChildren();
+  panel.append(element('div', 'titel', 'Form'));
+  const arten = element('div', 'reihe');
+  for (const [f, form] of Object.entries(FORMEN)) {
+    const b = element('button', 'form-wahl' + (f === formArt ? ' aktiv' : ''));
+    b.innerHTML = formSvg(f, formFarbe);
+    b.title = form.name;
+    b.setAttribute('aria-label', form.name);
+    b.addEventListener('click', () => { formArt = f; zeigeFormKnopf(); formAuswahl(true); });
+    arten.append(b);
+  }
+  panel.append(arten, element('div', 'titel', 'Füllung'));
+  const farben = element('div', 'reihe');
+  for (const f of FORMFARBEN) {
+    const b = element('button', 'farbe' + (f === 'none' ? ' ohne' : '') + (f === formFarbe ? ' aktiv' : ''));
+    if (f !== 'none') b.style.background = f;
+    b.title = f === 'none' ? 'Nur Rahmen' : 'Farbe ' + f;
+    b.setAttribute('aria-label', b.title);
+    b.addEventListener('click', () => { formFarbe = f; zeigeFormKnopf(); formAuswahl(false); });
+    farben.append(b);
+  }
+  panel.append(farben);
+}
+
+function zeigeFormKnopf() {
+  $('formen-knopf').innerHTML = formSvg(formArt, formFarbe) + 'Formen ▾';
+  $('formen-knopf').title = FORMEN[formArt].name + ' – zum Ändern klicken';
+}
+
 function zeigeStickerKnopf() {
   $('sticker-knopf').innerHTML = stickerSvg(stickerArt, stickerFarbe) + 'Sticker ▾';
   $('sticker-knopf').title = STICKER[stickerArt].name + ' – zum Ändern klicken';
@@ -366,6 +451,11 @@ document.addEventListener('pointerdown', e => {
   const panel = $('sticker-panel');
   if (!panel.hidden && !panel.contains(e.target) && !$('sticker-knopf').contains(e.target)) {
     stickerAuswahl(false);
+    schliessKlick = flaeche.contains(e.target);
+  }
+  const fp = $('formen-panel');
+  if (!fp.hidden && !fp.contains(e.target) && !$('formen-knopf').contains(e.target)) {
+    formAuswahl(false);
     schliessKlick = flaeche.contains(e.target);
   }
 });
@@ -415,7 +505,7 @@ function wegKnopfHinzufuegen(o, id) {
   knopf.addEventListener('pointerdown', e => e.stopPropagation());
   knopf.addEventListener('click', async e => {
     e.stopPropagation();
-    if (!confirm(o.typ === 'bild' ? 'Dieses Bild löschen?' : o.typ === 'sticker' ? 'Diesen Sticker löschen?' : 'Diesen Zettel löschen?')) return;
+    if (!confirm(o.typ === 'bild' ? 'Dieses Bild löschen?' : o.typ === 'sticker' ? 'Diesen Sticker löschen?' : o.typ === 'form' ? 'Diese Form löschen?' : 'Diesen Zettel löschen?')) return;
     const ok = bearbeitenModus ? await pinLoeschen(id) : await eigenesLoeschen(id);
     if (ok) objektEntfernen(id);
   });
@@ -431,7 +521,12 @@ function zeigeObjekt(z) {
       vorhanden.el.style.left = z.x + 'px';
       vorhanden.el.style.top = z.y + 'px';
     }
-    if (vorhanden.textEl && typeof z.text === 'string') vorhanden.textEl.textContent = z.text;
+    if (vorhanden.typ === 'form') { if (typeof z.text === 'string' && !vorhanden.groesse) formAnwenden(vorhanden, z.text, z.farbe, z.breite); }
+    else if (vorhanden.textEl && typeof z.text === 'string') vorhanden.textEl.textContent = z.text;
+    if (!vorhanden.groesse && typeof z.breite === 'number') {
+      if (vorhanden.typ === 'bild') vorhanden.el.style.width = z.breite + 'px';
+      if (vorhanden.typ === 'sticker') { vorhanden.el.style.width = z.breite + 'px'; vorhanden.el.style.height = z.breite + 'px'; }
+    }
     if (typeof z.gesperrt === 'boolean') setzeSperre(vorhanden, z.gesperrt);
     return;
   }
@@ -451,6 +546,8 @@ function zeigeObjekt(z) {
       el.append(img);
       el.style.width = (z.breite || BILD_BREITE) + 'px';
       el.addEventListener('dblclick', () => zeigeGross(z.bild));
+    } else if (z.typ === 'form') {
+      el = element('div', 'objekt form-objekt');
     } else if (z.typ === 'sticker') {
       el = element('div', 'objekt sticker');
       el.innerHTML = stickerSvg(z.text, z.farbe);
@@ -468,15 +565,112 @@ function zeigeObjekt(z) {
     el.style.top = z.y + 'px';
     flaeche.append(el);
   }
-  const o = { el, textEl, typ: z.typ, gesperrt: false, zieht: false, schloss: null, weg: null };
+  const o = { el, textEl, typ: z.typ, gesperrt: false, zieht: false, schloss: null, weg: null, griff: null, groesse: false };
+  if (z.typ === 'form') formAnwenden(o, z.text, z.farbe, z.breite);
   if (z.typ === 'zettel') el.addEventListener('dblclick', () => zettelBearbeiten(o, z.id));
+  if (z.typ === 'form') el.addEventListener('dblclick', () => formTextBearbeiten(o, z.id));
   objekte.set(z.id, o);
   if (z.typ !== 'linie') {
     ziehbarMachen(o, z.id);
     if (bearbeitenModus) schlossHinzufuegen(o, z.id);
     wegKnopfHinzufuegen(o, z.id);
+    griffHinzufuegen(o, z.id);
   }
   setzeSperre(o, !!z.gesperrt);
+}
+
+// ---------- Formen anzeigen ----------
+function formAnwenden(o, text, farbe, breite) {
+  const d = formDaten(text);
+  o.form = d;
+  if (farbe) o.farbe = farbe;
+  if (breite) o.el.style.width = breite + 'px';
+  o.el.style.height = d.h + 'px';
+  o.el.classList.toggle('dreieck', d.f === 'dreieck');
+  const knoepfe = [...o.el.querySelectorAll('.schloss, .weg-knopf, .griff')];
+  o.el.innerHTML = formSvg(d.f, o.farbe || '#c9e4ff');
+  o.el.append(element('span', 'form-text', d.t));
+  o.el.title = FORMEN[d.f].name;
+  knoepfe.forEach(k => o.el.append(k));
+}
+
+// Größe und Text ändern: Lehrende immer, Studierende nur Eigenes
+async function elementAendern(id, breite, text) {
+  if (bearbeitenModus) {
+    return mitPin(() => supabase.rpc('whiteboard_aendern', { p_id: id, p_breite: breite, p_text: text, p_schluessel: null }));
+  }
+  const { data, error } = await supabase.rpc('whiteboard_aendern',
+    { p_id: id, p_breite: breite, p_text: text, p_schluessel: schluesselVon(id) });
+  if (error) { zeigeFehler(error.message); return false; }
+  if (!data) { zeigeFehler('Das konnte nicht geändert werden (vielleicht ist es gesperrt).'); return false; }
+  return true;
+}
+
+async function formTextBearbeiten(o, id) {
+  if (modus !== 'zeigen') return;
+  if (!bearbeitenModus && (!schluesselVon(id) || o.gesperrt)) return;
+  const neu = prompt('Text in der Form:', o.form.t);
+  if (neu === null) return;
+  const daten = JSON.stringify({ f: o.form.f, h: o.form.h, t: neu.trim().slice(0, 200) });
+  if (await elementAendern(id, null, daten)) formAnwenden(o, daten);
+}
+
+// Ziehgriff unten rechts: Bilder, Sticker und Formen in der Größe ändern
+function griffHinzufuegen(o, id) {
+  if (o.griff || !['bild', 'sticker', 'form'].includes(o.typ) || !(bearbeitenModus || schluesselVon(id))) return;
+  const griff = element('button', 'griff');
+  griff.title = 'Größe ändern';
+  griff.setAttribute('aria-label', 'Größe ändern');
+  griff.addEventListener('pointerdown', e => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (modus !== 'zeigen' || (o.gesperrt && !bearbeitenModus)) return;
+    griff.setPointerCapture(e.pointerId);
+    o.groesse = true;
+    const start = punktVon(e);
+    const startB = o.el.offsetWidth;
+    const startH = o.el.offsetHeight;
+    const links = parseInt(o.el.style.left, 10);
+    const oben = parseInt(o.el.style.top, 10);
+    const maxB = Math.min(1200, 2400 - links);
+    const maxH = Math.min(1200, 1600 - oben);
+    let b = startB;
+    let h = startH;
+    const bewegen = ev => {
+      const p = punktVon(ev);
+      if (o.typ === 'form') {
+        b = Math.round(Math.min(maxB, Math.max(60, startB + p[0] - start[0])));
+        h = Math.round(Math.min(maxH, Math.max(40, startH + p[1] - start[1])));
+        o.el.style.width = b + 'px';
+        o.el.style.height = h + 'px';
+      } else {
+        // Bilder und Sticker behalten ihr Seitenverhältnis
+        const f = Math.max((p[0] - start[0]) / startB, (p[1] - start[1]) / startH);
+        b = Math.round(Math.min(maxB, Math.max(60, startB * (1 + f))));
+        o.el.style.width = b + 'px';
+        if (o.typ === 'sticker') o.el.style.height = b + 'px';
+      }
+    };
+    const loslassen = async () => {
+      griff.removeEventListener('pointermove', bewegen);
+      griff.removeEventListener('pointerup', loslassen);
+      griff.removeEventListener('pointercancel', loslassen);
+      const daten = o.typ === 'form' ? JSON.stringify({ f: o.form.f, h, t: o.form.t }) : null;
+      const ok = await elementAendern(id, b, daten);
+      o.groesse = false;
+      if (!ok) {
+        o.el.style.width = startB + 'px';
+        if (o.typ !== 'bild') o.el.style.height = startH + 'px';
+      } else if (o.typ === 'form') {
+        o.form.h = h;
+      }
+    };
+    griff.addEventListener('pointermove', bewegen);
+    griff.addEventListener('pointerup', loslassen);
+    griff.addEventListener('pointercancel', loslassen);
+  });
+  o.el.append(griff);
+  o.griff = griff;
 }
 
 function objektEntfernen(id) {
@@ -571,6 +765,26 @@ flaeche.addEventListener('click', async e => {
   const { data, error } = await supabase.from('whiteboard').insert({
     board, typ: 'sticker', text: stickerArt, farbe: STICKER[stickerArt].farbig ? stickerFarbe : '#000000', breite: g,
     x: Math.max(0, Math.min(2400 - g, x - g / 2)), y: Math.max(0, Math.min(1600 - g, y - g / 2)),
+    loesch_hash: k ? k.hash : null,
+  }).select().single();
+  if (error) { zeigeFehler(error.message); return; }
+  zeigeObjekt(data);
+  merkeEigenes(data.id, k);
+});
+
+// ---------- Formen anlegen ----------
+flaeche.addEventListener('click', async e => {
+  if (modus !== 'form') return;
+  if (schliessKlick) { schliessKlick = false; return; }
+  const [x, y] = punktVon(e);
+  const text = prompt('Text in der Form (optional, kann leer bleiben):', '');
+  if (text === null) return;
+  const form = FORMEN[formArt];
+  const k = await neuerSchluessel();
+  const { data, error } = await supabase.from('whiteboard').insert({
+    board, typ: 'form', farbe: formFarbe, breite: form.b,
+    text: JSON.stringify({ f: formArt, h: form.h, t: text.trim().slice(0, 200) }),
+    x: Math.max(0, Math.min(2400 - form.b, x - form.b / 2)), y: Math.max(0, Math.min(1600 - form.h, y - form.h / 2)),
     loesch_hash: k ? k.hash : null,
   }).select().single();
   if (error) { zeigeFehler(error.message); return; }
@@ -724,6 +938,7 @@ if (bearbeitenModus) {
 // ---------- Laden ----------
 setzeModus('zeigen');
 zeigeStickerKnopf();
+zeigeFormKnopf();
 const [r1, r2] = await Promise.all([
   supabase.from('whiteboard').select('*').eq('board', board).order('created_at'),
   supabase.from('faelle').select('*').eq('board', board).eq('fall', 'frage'),
