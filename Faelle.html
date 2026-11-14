@@ -47,6 +47,11 @@
   #gross { position: fixed; inset: 0; background: rgba(10,20,35,.85); display: flex; align-items: center;
            justify-content: center; padding: 1.5rem; z-index: 20; cursor: zoom-out; }
   #gross[hidden] { display: none; }
+  [hidden] { display: none !important; }
+  #gruppe-kopf { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem 1rem; margin-bottom: 1rem; }
+  #gruppe-kopf strong { font-size: 1.15rem; }
+  #gruppe-kopf a { color: #3f5673; font-size: .9rem; cursor: pointer; text-decoration: underline; }
+  .sicht-zeile { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-top: .9rem; }
   #gross img { max-width: 100%; max-height: 100%; border-radius: 8px; background: #fff; }
 </style>
 </head>
@@ -54,6 +59,16 @@
 <h1>Fallarbeit</h1>
 <div id="status">Verbinde …</div>
 <div id="fehler" hidden></div>
+<div class="fall" id="gruppe-waehlen" hidden style="margin-bottom:1.5rem">
+  <h2>Welche Gruppe seid ihr?</h2>
+  <div class="zeile" id="gruppen-knoepfe"></div>
+  <p class="bild-hinweis">Ihr seht nur die Beiträge eurer eigenen Gruppe, bis die Lehrperson die anderen freigibt.</p>
+</div>
+<div id="gruppe-kopf" hidden>
+  <strong id="gruppe-name"></strong>
+  <span class="bild-hinweis" style="margin:0">Die Beiträge der anderen Gruppen sind noch verborgen.</span>
+  <a id="gruppe-wechseln">Andere Gruppe wählen</a>
+</div>
 <div id="faelle"></div>
 <div id="gross" hidden><img alt="Bild in groß"></div>
 
@@ -69,6 +84,10 @@ const MAX_GRUPPEN = 12;
 let FAELLE = [];
 let GRUPPEN = [];
 let aufbauText = '';
+let sichtbarkeit = 'alle';     // 'alle' oder 'eigene' (jede Gruppe sieht nur ihre eigenen Beiträge)
+let meineGruppe = null;
+const gruppenBoxen = [];
+let zeigeSichtSchalter = () => {};
 
 // >>> Bilder: höchstens so viele pro Fall, und so breit (in Pixeln) werden sie gespeichert <<<
 const MAX_BILDER = 4;
@@ -194,6 +213,9 @@ async function aendern(tabelle, id, text) {
 const { data } = await supabase.from('faelle').select('beschreibung')
 .eq('board', board).eq('fall', 'aufbau').maybeSingle();
 aufbauText = data ? data.beschreibung : '';
+const sicht = await supabase.from('faelle').select('beschreibung')
+.eq('board', board).eq('fall', 'sichtbarkeit').maybeSingle();
+sichtbarkeit = sicht.data && sicht.data.beschreibung === 'eigene' ? 'eigene' : 'alle';
 const [f, g] = aufbauText.split(';').map(Number);
 const anzahlFaelle = f >= 1 && f <= MAX_FAELLE ? f : STANDARD_FAELLE;
 const anzahlGruppen = g >= 1 && g <= MAX_GRUPPEN ? g : STANDARD_GRUPPEN;
@@ -225,9 +247,50 @@ const ok = await mitPin(p => supabase.rpc('fall_speichern',
 { p_board: board, p_fall: 'aufbau', p_text: nf + ';' + ng, p_pin: p }));
 if (ok) location.reload();
 });
+// Sichtbarkeit der Gruppenbeiträge
+const sichtZeile = element('div', 'sicht-zeile');
+const sichtText = element('span', '');
+const sichtKnopf = element('button', '');
+sichtZeile.append(sichtText, sichtKnopf);
+box.append(sichtZeile);
+zeigeSichtSchalter = () => {
+sichtText.textContent = sichtbarkeit === 'eigene'
+? 'Gerade sieht jede Gruppe nur ihre eigenen Beiträge.'
+: 'Gerade sehen alle Gruppen alle Beiträge.';
+sichtKnopf.textContent = sichtbarkeit === 'eigene' ? '🔓 Beiträge aller Gruppen freigeben' : '🔒 Nur eigene Gruppe anzeigen';
+};
+zeigeSichtSchalter();
+sichtKnopf.addEventListener('click', async () => {
+const neu = sichtbarkeit === 'eigene' ? 'alle' : 'eigene';
+if (await mitPin(p => supabase.rpc('fall_speichern', { p_board: board, p_fall: 'sichtbarkeit', p_text: neu, p_pin: p }))) {
+sichtbarkeit = neu;
+zeigeSichtSchalter();
+}
+});
 $('faelle').before(box);
 }
 }
+
+// ---------- Nur eigene Gruppe anzeigen (wenn eingestellt) ----------
+function sichtbarkeitAnwenden() {
+const verbergen = !bearbeitenModus && sichtbarkeit === 'eigene';
+if (meineGruppe && meineGruppe > GRUPPEN.length) meineGruppe = null;
+$('gruppe-waehlen').hidden = !(verbergen && !meineGruppe);
+$('faelle').hidden = verbergen && !meineGruppe;
+$('gruppe-kopf').hidden = !(verbergen && meineGruppe);
+$('gruppe-name').textContent = meineGruppe ? GRUPPEN[meineGruppe - 1] : '';
+for (const g of gruppenBoxen) g.el.hidden = verbergen && g.nr !== meineGruppe;
+if (verbergen && !meineGruppe) {
+const k = $('gruppen-knoepfe');
+k.replaceChildren();
+GRUPPEN.forEach((name, i) => {
+const b = element('button', '', name);
+b.addEventListener('click', () => { meineGruppe = i + 1; sichtbarkeitAnwenden(); });
+k.append(b);
+});
+}
+}
+$('gruppe-wechseln').addEventListener('click', () => { meineGruppe = null; sichtbarkeitAnwenden(); });
 // ---------- Fälle aufbauen ----------
 for (const fall of FAELLE) {
   const box = element('div', 'fall');
@@ -313,10 +376,12 @@ for (const fall of FAELLE) {
     });
     gruppe.append(element('h3', '', name), liste, form);
     box.append(gruppe);
+    gruppenBoxen.push({ el: gruppe, nr: i + 1 });
   });
 
   $('faelle').append(box);
 }
+sichtbarkeitAnwenden();
 
 // ---------- Bilder ----------
 function zeichneBilder(fallId) {
@@ -440,6 +505,12 @@ function beitragEntfernen(id) {
 function verarbeiteFall(zeile) {
 if (zeile.fall === 'aufbau') {
 if ((zeile.beschreibung || '') !== aufbauText) location.reload();
+return;
+}
+if (zeile.fall === 'sichtbarkeit') {
+sichtbarkeit = zeile.beschreibung === 'eigene' ? 'eigene' : 'alle';
+zeigeSichtSchalter();
+sichtbarkeitAnwenden();
 return;
 }
   for (const fall of FAELLE) {
