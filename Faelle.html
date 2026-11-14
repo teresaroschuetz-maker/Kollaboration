@@ -365,12 +365,17 @@ for (const fall of FAELLE) {
     form.addEventListener('submit', async e => {
       e.preventDefault();
       const k = await neuerSchluessel();
+      const knopf = form.querySelector('button');
+      knopf.disabled = true;
       const { data, error } = await supabase.from('notes')
         .insert({ board, kachel: schluessel, text: input.value.trim(), loesch_hash: k ? k.hash : null })
-        .select('id').single();
-      if (error) { zeigeFehler(error.message); return; }
+        .select().single();
+      knopf.disabled = false;
+      if (error) { zeigeFehler('Der Beitrag wurde nicht gespeichert: ' + error.message); return; }
       input.value = '';
       merkeEigenes('notes', data.id, k);
+      // Eigenen Beitrag sofort zeigen, nicht erst, wenn die Live-Verbindung ihn meldet
+      addNote(data);
       const vorhanden = beitragElemente.get(data.id);
       if (vorhanden) beitragKnoepfe(vorhanden);
     });
