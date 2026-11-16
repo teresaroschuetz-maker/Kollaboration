@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Meine Tools sind umgezogen</title>
+  <script>
+    // Leitet alte Links (…github.io/Kollaboration/…) auf die neue Adresse um.
+    // Pfad, Parameter (?…) und Anker (#…) bleiben erhalten, damit z. B.
+    // Links zu einer bestimmten Pinnwand weiter funktionieren.
+    var ziel = 'https://tools.werkraum-lehre.at';
+    var pfad = location.pathname.replace(/^\/Kollaboration/i, '') || '/';
+    var neu = ziel + pfad + location.search + location.hash;
+    location.replace(neu);
+  </script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 36rem; margin: 4rem auto; padding: 0 1rem; line-height: 1.5; color: #222; }
+    a { color: #1a5fb4; }
+  </style>
+</head>
+<body>
+  <h1>Meine Tools sind umgezogen</h1>
+  <p>Die neue Adresse lautet:
+    <a id="neuer-link" href="https://tools.werkraum-lehre.at">tools.werkraum-lehre.at</a>
+  </p>
+  <p>Du wirst gleich automatisch weitergeleitet. Falls nicht, klick bitte auf den Link
+     und speichere dir die neue Adresse als Lesezeichen.</p>
+  <script>
+    document.getElementById('neuer-link').href = neu;
+  </script>
+</body>
+</html>
